@@ -1,0 +1,13 @@
+# Ignore build and generated files
+miniapp/dist/
+miniapp/.vite/
+miniapp/node_modules/
+miniapp/playwright-report/
+miniapp/test-results/
+
+# Ignore generated assets
+**/dist/**
+**/node_modules/**
+
+# Logs
+*.log

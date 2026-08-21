@@ -1,0 +1,3 @@
+interface:
+  display_name: "Intent Observability"
+  short_description: "Improve production diagnostics and incident visibility"

@@ -1,0 +1,87 @@
+name: Miniapp CI
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  miniapp-verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache miniapp node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            miniapp/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-miniapp-${{ hashFiles('miniapp/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-miniapp-
+
+      - name: Install miniapp dependencies
+        run: npm ci --prefix miniapp
+
+      - name: Run npm audit (fail on high)
+        run: npm audit --prefix miniapp --audit-level=high
+
+      - name: Lint miniapp
+        run: npm run lint --prefix miniapp
+
+      - name: Build miniapp
+        run: npm run build --prefix miniapp
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Serve built miniapp for Lighthouse
+        run: npx http-server miniapp/dist -p 5000 &
+
+      - name: Run Lighthouse (performance & accessibility)
+        run: |
+          npx -y lighthouse http://localhost:5000 --output=json --output-path=miniapp/lighthouse.json --quiet || true
+
+      - name: Run Playwright tests
+        run: npm run test:e2e --prefix miniapp
+        env:
+          CI: true
+
+      - name: Upload Playwright report (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-playwright-report
+          path: miniapp/playwright-report/**
+          retention-days: 30
+
+      - name: Upload Playwright videos/screenshots (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-playwright-artifacts
+          path: miniapp/**/test-results/**
+          retention-days: 30
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-lighthouse
+          path: miniapp/lighthouse.json
+          retention-days: 30

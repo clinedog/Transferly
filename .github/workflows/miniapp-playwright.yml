@@ -1,0 +1,53 @@
+name: MiniApp Playwright Tests
+
+on:
+  pull_request:
+    paths:
+      - 'miniapp/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'miniapp/**'
+
+jobs:
+  playwright-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install miniapp dependencies
+        run: npm ci --prefix miniapp
+
+      - name: Build miniapp
+        run: npm run build --prefix miniapp
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Serve miniapp (background)
+        run: npx http-server miniapp/dist -p 4173 &
+
+      - name: Run Playwright tests
+        run: npx playwright test --project=chromium --reporter=github
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-playwright-report
+          path: playwright-report
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-test-results
+          path: miniapp/test-results || playwright-report

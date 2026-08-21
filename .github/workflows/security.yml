@@ -1,0 +1,57 @@
+name: Security & Dependency Scanning
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [api, miniapp, bot]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install ${{ matrix.package }} dependencies
+        run: npm ci --prefix ${{ matrix.package }}
+
+      - name: Audit ${{ matrix.package }}
+        run: npm audit --prefix ${{ matrix.package }} --audit-level=high
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run dependency check
+        uses: jeremylong/DependencyCheck_Action@main
+        with:
+          project: 'Transferly'
+          path: '.'
+          format: 'JSON'
+          args: >
+            --enableExperimental
+            --scan .
+
+      - name: Upload OWASP results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports/

@@ -1,0 +1,81 @@
+name: API CI
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+      - '.github/workflows/api-ci.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+
+jobs:
+  api-verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    permissions:
+      contents: read
+      security-events: write
+
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache api node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            api/node_modules
+            ~/.npm
+          key: ${{ runner.os }}-api-${{ hashFiles('api/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-api-
+
+      - name: Install api dependencies
+        run: npm ci --prefix api
+
+      - name: Run npm audit
+        run: npm audit --prefix api --audit-level=high
+
+      - name: Lint api
+        run: npm run lint --prefix api
+
+      - name: Run database migration
+        run: npm run db:migrate --prefix api
+        env:
+          SQLITE_DATABASE_PATH: ./data/test-transferly.sqlite
+
+      - name: Run api tests
+        run: npm test --prefix api
+        env:
+          SQLITE_DATABASE_PATH: ./data/test-transferly.sqlite
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: api/test-results/
+          retention-days: 30

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Intent Queue Recovery"
+  short_description: "Improve BullMQ worker reliability and dead-letter recovery"

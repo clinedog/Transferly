@@ -1,0 +1,3 @@
+interface:
+  display_name: "Intent Webhooks"
+  short_description: "Harden provider and Telegram webhook ingestion"

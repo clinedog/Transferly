@@ -1,0 +1,47 @@
+{
+  "name": "transferly-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Transferly production-grade payments, invoicing, payouts, and wallet backend",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon app.js",
+    "dev:worker": "nodemon jobs/worker.js",
+    "start": "node app.js",
+    "worker": "node jobs/worker.js",
+    "db:migrate": "node db/migrate.js",
+    "db:migrate:status": "node db/migrationStatus.js",
+    "db:seed": "node db/seed.js",
+    "smoke:providers": "node scripts/providerSmoke.js",
+    "smoke:readiness": "node scripts/deploymentReadinessSmoke.js",
+    "verify:paypal:sandbox": "node scripts/paypalSandboxSmoke.js",
+    "lint": "eslint .",
+    "test": "node -r ./test/setup-test-env.js --test --test-concurrency=1"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "bullmq": "^5.34.10",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.1",
+    "pino": "^9.5.0",
+    "sqlite3": "^6.0.1",
+    "tweetnacl": "^1.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
+    "globals": "^15.12.0",
+    "nodemon": "^3.1.7"
+  },
+  "allowScripts": {
+    "sqlite3@6.0.1": true
+  }
+}

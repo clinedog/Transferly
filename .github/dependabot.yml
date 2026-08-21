@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/miniapp"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"

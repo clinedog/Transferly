@@ -1,0 +1,35 @@
+{
+  "name": "transferly",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Transferly API, Telegram bot, and Telegram Mini App workspace",
+  "scripts": {
+    "install:all": "npm install --prefix api && npm install --prefix bot && npm install --prefix miniapp",
+    "lint": "npm run lint --prefix api",
+    "format": "npm run lint --prefix api -- --fix",
+    "format:check": "npm run lint --prefix api",
+    "test": "npm test --prefix api && npm test --prefix bot",
+    "build": "npm run build --prefix miniapp",
+    "verify": "npm run lint --prefix api && npm test --prefix api && npm test --prefix bot && npm run build --prefix miniapp",
+    "check:production": "node scripts/check-production-readiness.js",
+    "verify:staging": "node scripts/verify-staging.js",
+    "check:miniapp:bundle": "node scripts/check-miniapp-bundle-budget.js",
+    "scan:secrets": "node scripts/scan-secrets.js",
+    "validate:skills": "node scripts/validate-skills.js",
+    "verify:release": "npm run verify && npm run check:production && npm run verify:staging && npm run check:miniapp:bundle && npm run scan:secrets",
+    "api:dev": "npm run dev --prefix api",
+    "api:worker": "npm run dev:worker --prefix api",
+    "api:migrate": "npm run db:migrate --prefix api",
+    "api:migrate:status": "npm run db:migrate:status --prefix api",
+    "api:seed": "npm run db:seed --prefix api",
+    "bot:dev": "npm run dev --prefix bot",
+    "bot:setup": "npm run setup --prefix bot",
+    "miniapp:dev": "npm run dev --prefix miniapp",
+    "miniapp:e2e": "npm run test:e2e --prefix miniapp",
+    "miniapp:e2e:list": "npm run test:e2e:list --prefix miniapp"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "globals": "^17.7.0"
+  }
+}

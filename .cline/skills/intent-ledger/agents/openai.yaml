@@ -1,0 +1,3 @@
+interface:
+  display_name: "Intent Ledger"
+  short_description: "Protect Transferly financial consistency and ledger invariants"
