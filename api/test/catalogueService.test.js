@@ -105,6 +105,7 @@ test('catalogue filters services by authentication, role, feature flag, and know
   assert.equal(userSlugs.has('catalogue-unknown-role'), false);
   assert.equal(userSlugs.has('catalogue-unknown-permission'), false);
   assert.equal(userSlugs.has('transaction-record'), true);
+  assert.equal(userSlugs.has('paypal'), true);
   assert.equal(userSlugs.has('opay'), false);
   assert.equal(userSlugs.has('pass-clone'), false);
   assert.equal(adminSlugs.has('catalogue-admin'), true);

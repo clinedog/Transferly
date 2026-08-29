@@ -50,11 +50,20 @@ const submitFundingEvidenceSchema = z.object({
   userNote: z.string().trim().max(1000).optional().default('')
 }).strict();
 
+const uploadFundingEvidenceSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  contentBase64: z.string().trim().min(1),
+  userTransactionReference: z.string().trim().max(120).optional().default(''),
+  userNote: z.string().trim().max(1000).optional().default('')
+}).strict();
+
 module.exports = {
   createFundingRequestSchema,
   createTopUpOrderSchema,
   fundingRequestParamsSchema,
   submitFundingEvidenceSchema,
+  uploadFundingEvidenceSchema,
   topUpOrderParamsSchema,
   updateTopUpOrderStatusSchema,
   updateCurrentUserProfileSchema,

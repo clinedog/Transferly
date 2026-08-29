@@ -112,14 +112,15 @@ test("start launcher exposes one primary Mini App entry point", () => {
   const startLabels = labels(buildStartKeyboard(ctx(), { role: ROLES.OWNER, status: STATUS.ACTIVE, isAuthorized: true, isAdmin: true, isOwner: true }));
   assert.deepEqual(startLabels, [
     PRIMARY_MINI_APP_LABEL,
-    CONTROL_LABELS.account,
-    CONTROL_LABELS.notifications,
-    CONTROL_LABELS.settings,
-    CONTROL_LABELS.help,
+    CONTROL_LABELS.buyPoints,
+    CONTROL_LABELS.services,
+    CONTROL_LABELS.orders,
+    CONTROL_LABELS.wallet,
+    CONTROL_LABELS.support,
   ]);
   assert.equal(startLabels.filter((label) => label.includes("Open")).length, 1);
   assert.equal(startLabels.includes("💳 Providers"), false);
-  assert.equal(startLabels.includes("🧰 Services"), false);
+  assert.equal(startLabels.includes(CONTROL_LABELS.services), true);
   assert.equal(startLabels.includes("📄 Invoices"), false);
   assert.equal(startLabels.includes("👥 Users"), false);
 });
@@ -127,19 +128,19 @@ test("start launcher exposes one primary Mini App entry point", () => {
 test("mini app launch URLs use the exact configured launcher URL", () => {
   assert.equal(buildMiniAppUrl("home"), "https://mini.transferly.test");
   assert.equal(buildMiniAppUrl("dashboard"), "https://mini.transferly.test");
-  assert.equal(buildMiniAppUrl("invoices"), "https://mini.transferly.test");
-  assert.equal(buildMiniAppUrl("generate"), "https://mini.transferly.test");
-  assert.equal(buildMiniAppUrl("history"), "https://mini.transferly.test");
-  assert.equal(buildMiniAppUrl("wallet"), "https://mini.transferly.test");
-  assert.equal(buildMiniAppUrl("services/paypal/invoices"), "https://mini.transferly.test");
+  assert.equal(buildMiniAppUrl("invoices"), "https://mini.transferly.test/miniapp/invoices");
+  assert.equal(buildMiniAppUrl("generate"), "https://mini.transferly.test/miniapp/studio");
+  assert.equal(buildMiniAppUrl("history"), "https://mini.transferly.test/miniapp/vault");
+  assert.equal(buildMiniAppUrl("wallet"), "https://mini.transferly.test/miniapp/wallet");
+  assert.equal(buildMiniAppUrl("services/paypal/invoices"), "https://mini.transferly.test/miniapp/services/paypal/invoices");
   assert.equal(buildMiniAppUrl("../admin"), "https://mini.transferly.test");
 });
 
-test("known Mini App route contract remains delegated to the same launcher", () => {
-  for (const section of Object.keys(MINI_APP_SECTIONS)) {
-    const url = buildMiniAppUrl(section);
-    assert.equal(url, "https://mini.transferly.test");
-  }
+test("known Mini App route contract maps to safe app routes", () => {
+  assert.equal(buildMiniAppUrl('dashboard'), 'https://mini.transferly.test');
+  assert.equal(buildMiniAppUrl('services'), 'https://mini.transferly.test/miniapp/services');
+  assert.equal(buildMiniAppUrl('orders'), 'https://mini.transferly.test/miniapp/orders');
+  assert.equal(buildMiniAppUrl('support'), 'https://mini.transferly.test/miniapp/support');
 });
 
 test("runtime status does not expose configured tokens", () => {
@@ -164,15 +165,9 @@ test("mini app buttons use Telegram Web App launch by default", () => {
   });
 });
 
-test("primary control menu exposes focused account notification settings callbacks", () => {
+test("primary control menu uses Mini App deep links instead of chat workflows", () => {
   const actions = callbackActions(buildStartKeyboard(ctx(), { role: ROLES.USER, status: STATUS.ACTIVE, isAuthorized: true }));
-
-  assert.deepEqual(actions, [
-    CONTROL_ACTIONS.ACCOUNT,
-    CONTROL_ACTIONS.NOTIFICATIONS,
-    CONTROL_ACTIONS.SETTINGS,
-    CONTROL_ACTIONS.HELP,
-  ]);
+  assert.deepEqual(actions, []);
 });
 
 test("main menu is role-aware", () => {
@@ -319,7 +314,7 @@ test("service catalog keyboard hands off to the Mini App", () => {
 test("service command centers stay delegated to the Mini App", () => {
   const service = searchServices("faker-data")[0];
   const lane = getServiceLane(service, "sandbox-payload");
-  assert.equal(lane.label, "Sandbox Payload");
+  assert.equal(lane, null);
 
   const detailKeyboard = buildServiceDetailKeyboard(ctx(), service);
   const detailLabels = labels(detailKeyboard);
@@ -328,19 +323,14 @@ test("service command centers stay delegated to the Mini App", () => {
   assert.equal(detailLabels.includes("✅ Sandbox Payload"), false);
   assert.equal(callbackActions(detailKeyboard).includes("SERVICE_LANE:faker-data:sandbox-payload"), false);
 
-  const laneKeyboard = buildServiceLaneKeyboard(ctx(), service, lane);
-  assert.ok(labels(laneKeyboard).includes("🚀 Open Transferly"));
-  assert.equal(labels(laneKeyboard).includes("🚀 Start Lane"), false);
-  assert.equal(labels(laneKeyboard).includes("✍️ Custom Details"), false);
-  assert.equal(callbackActions(laneKeyboard).includes("SERVICE_ACTION:faker-data:sandbox-payload"), false);
 });
 
-test("service catalog permits only the explicitly labelled sandbox legacy generator", () => {
+test("service catalogue disables legacy generation for the production MVP", () => {
   const generatable = SERVICE_CATALOG.filter(canGenerateService).map((service) => service.slug);
-  assert.deepEqual(generatable, ["faker-data"]);
+  assert.deepEqual(generatable, []);
 
   const sandbox = searchServices("faker-data")[0];
-  assert.equal(sandbox.status, "sandbox");
+  assert.equal(sandbox.status, "preview");
   assert.equal(sandbox.executionMode, "sandbox");
 
   for (const slug of ["opay", "binance", "paypal", "crypto-receipts", "transaction-record"]) {

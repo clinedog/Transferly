@@ -5,6 +5,7 @@ const { test } = require('node:test');
 
 const {
   AVAILABLE_SERVICE_STATUSES,
+  PRODUCTION_SERVICE_CATALOGUE,
   SANDBOX_REQUIRED_MARKINGS,
   SERVICE_CATALOGUE_SEED,
   SERVICE_STATUS_VALUES
@@ -17,7 +18,7 @@ async function loadMiniAppContract() {
 
 test('Mini App catalogue policy stays aligned with the API manifest', async () => {
   const client = await loadMiniAppContract();
-  const serverPolicy = SERVICE_CATALOGUE_SEED.map(({ slug, title, category, badge, status }) => ({
+  const serverPolicy = PRODUCTION_SERVICE_CATALOGUE.map(({ slug, title, category, badge, status }) => ({
     slug,
     title,
     category,
@@ -57,4 +58,13 @@ test('unsafe legacy generators stay unavailable in the API and Mini App policies
   for (const service of client.SERVICE_CATALOGUE_POLICY.filter(({ slug }) => unsafeSlugs.has(slug))) {
     assert.equal(client.isServiceAvailable(service), false, `${service.slug} must remain unavailable in the Mini App`);
   }
+});
+
+test('production catalogue exposes only PayPal as available', async () => {
+  const client = await loadMiniAppContract();
+  const serverAvailable = PRODUCTION_SERVICE_CATALOGUE.filter(({ status }) => AVAILABLE_SERVICE_STATUSES.includes(status));
+  const clientAvailable = client.SERVICE_CATALOGUE_POLICY.filter(client.isServiceAvailable);
+
+  assert.deepEqual(serverAvailable.map(({ slug }) => slug), ['paypal']);
+  assert.deepEqual(clientAvailable.map(({ slug }) => slug), ['paypal']);
 });

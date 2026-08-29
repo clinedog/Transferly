@@ -109,7 +109,7 @@ export default function AboutPage() {
             </h2>
             <div className="bg-gray-50 rounded-lg p-8 border border-gray-200 my-8">
               <p className="text-gray-700 mb-4">
-                Have questions? We'd love to hear from you. Reach out to our team:
+                Have questions? We&apos;d love to hear from you. Reach out to our team:
               </p>
               <ul className="space-y-2 text-gray-700">
                 <li>

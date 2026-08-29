@@ -35,7 +35,7 @@ function badgeTone(label) {
 }
 
 export default function ServicesPage() {
-  const { config, profile } = useAppContext();
+  const { config } = useAppContext();
   const brand = config?.brand_color || '#f8812d';
   const aiReply = getServiceBySlug('ai-reply');
   const scriptsGroup = serviceGroups.find((group) => group.title === 'Template Marketplace');

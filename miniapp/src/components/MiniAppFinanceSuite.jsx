@@ -66,7 +66,7 @@ function formatMoney(value, currency = 'USD') {
       currency,
       maximumFractionDigits: 2
     }).format(amount);
-  } catch (_error) {
+  } catch {
     return currencyFormatter.format(amount);
   }
 }
@@ -1735,24 +1735,71 @@ export function AnalyticsSection() {
 }
 
 export function NotificationsSection() {
-  const items = [
-    { icon: BadgeCheck, tone: 'success', title: 'Invoice paid', body: 'Atlas Studio completed a PayPal invoice.', time: 'now' },
-    { icon: WalletCards, tone: 'warn', title: 'Payout requires review', body: 'Large payout is waiting for operator approval.', time: '4m' },
-    { icon: ShieldAlert, tone: 'danger', title: 'Webhook retry detected', body: 'Provider event needs reconciliation.', time: '12m' },
-    { icon: MessageCircle, tone: 'info', title: 'Support handoff ready', body: 'Context bundle can be copied into Telegram.', time: '1h' }
-  ];
+  const { notifications, fetchNotifications, markNotificationRead } = useAppContext();
+  const [loading, setLoading] = useState(true);
+  const unread = notifications.filter((notification) => !notification.read_at);
+
+  useEffect(() => {
+    let active = true;
+    fetchNotifications().finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchNotifications]);
+
+  const openNotification = async (notification) => {
+    if (!notification.read_at) {
+      await markNotificationRead(notification.id);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <SuiteHeader eyebrow="Notifications" title="Actionable alerts, not noise." body="Payments, reviews, disputes, system health, and support messages are grouped by urgency with deep links into the right record." icon={Bell} />
+      <SuiteHeader eyebrow="Notifications" title="Your Transferly updates." body="Funding, points, PayPal orders, and account actions appear here from authoritative backend events." icon={Bell} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard icon={Bell} label="Unread" value="4" />
-        <MetricCard icon={AlertTriangle} label="Critical" value="1" />
-        <MetricCard icon={ShieldCheck} label="Muted rules" value="0" />
+        <MetricCard icon={Bell} label="Unread" value={unread.length.toLocaleString()} />
+        <MetricCard icon={BadgeCheck} label="Total" value={notifications.length.toLocaleString()} />
+        <MetricCard icon={ShieldCheck} label="Delivery" value="In app" />
       </div>
-      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
-        <Timeline events={items} />
-      </section>
+      {loading ? (
+        <div className="grid gap-3" role="status" aria-label="Loading notifications">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="h-24 animate-pulse rounded-[22px] bg-[var(--tg-secondary-bg-color)]" />
+          ))}
+        </div>
+      ) : notifications.length ? (
+        <section className="space-y-3 rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+          {notifications.map((notification) => {
+            const target = notification.data?.deep_link || '/miniapp/notifications';
+            return (
+              <Link
+                key={notification.id}
+                to={target}
+                onClick={() => openNotification(notification)}
+                className={`block rounded-[22px] border p-4 transition active:scale-[0.99] ${notification.read_at ? 'border-transparent bg-[var(--tg-secondary-bg-color)]' : 'border-[var(--tg-button-color)] bg-[color-mix(in_srgb,var(--tg-button-color)_8%,var(--tg-secondary-bg-color))]'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--tg-section-bg-color)] text-[var(--tg-button-color)]">
+                    <Bell size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="font-black text-[var(--tg-text-color)]">{notification.title}</span>
+                      {!notification.read_at ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--tg-button-color)]" aria-label="Unread" /> : null}
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-[var(--tg-subtitle-text-color)]">{notification.message}</span>
+                    <span className="mt-2 block text-[11px] font-bold text-[var(--tg-hint-color)]">{formatDate(notification.created_at)}</span>
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+      ) : (
+        <EmptyState icon={Bell} title="No notifications yet" body="Funding, points, PayPal orders, and required actions will appear here." />
+      )}
     </div>
   );
 }
@@ -2064,7 +2111,7 @@ export function ProviderCommandCenter() {
       await fetchProviderBalances(providers.length ? providers : providerRows.map((provider) => ({ key: provider.key })));
       toast.success('Provider command center refreshed');
       telegram.notify('success');
-    } catch (_error) {
+    } catch {
       toast.error('Unable to refresh provider command center');
       telegram.notify('error');
     } finally {

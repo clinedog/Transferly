@@ -116,6 +116,12 @@ test('collectProductionConfigErrors rejects unsafe production defaults and token
   assert.ok(errors.some((error) => error.includes('POINTS_FUNDING_ACCOUNT_NUMBER')));
 });
 
+test('collectProductionConfigErrors rejects disabling the PayPal-only production scope', () => {
+  const parsed = createParsed({ NODE_ENV: 'production', PAYPAL_ONLY_PRODUCTION_MVP: false });
+  const derived = deriveEnvironmentConfig(parsed, { resolvePath: (value) => value });
+  assert.ok(collectProductionConfigErrors(parsed, derived).some((error) => error.includes('PAYPAL_ONLY_PRODUCTION_MVP')));
+});
+
 test('collectProductionConfigErrors accepts strongly configured core production PayPal setup', () => {
   const strong = (prefix) => `${prefix}_${'a'.repeat(48)}`;
   const productionTokenLiteral = `1234567890:${'b'.repeat(32)}`;
@@ -134,7 +140,8 @@ test('collectProductionConfigErrors accepts strongly configured core production 
     TELEGRAM_BOT_TOKEN: productionTokenLiteral,
     TELEGRAM_WEBHOOK_SECRET: strong('telegram'),
     USER_API_TOKENS: 'demo-user:' + strong('user'),
-    PAYMENT_PROVIDER_FEATURE_FLAGS: 'paypal'
+    PAYMENT_PROVIDER_FEATURE_FLAGS: 'paypal',
+    PAYPAL_ONLY_PRODUCTION_MVP: true
   });
   const derived = deriveEnvironmentConfig(parsed, { resolvePath: (value) => value });
 

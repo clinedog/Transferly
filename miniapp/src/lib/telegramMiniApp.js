@@ -131,7 +131,7 @@ export function isTelegramVersionAtLeast(webApp = getTelegramWebApp(), minimumVe
   if (typeof webApp.isVersionAtLeast === 'function') {
     try {
       return Boolean(webApp.isVersionAtLeast(minimumVersion));
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -147,7 +147,7 @@ export function isTelegramVersionAtLeast(webApp = getTelegramWebApp(), minimumVe
 function safeTelegramCall(callback) {
   try {
     callback?.();
-  } catch (_error) {
+  } catch {
     // Telegram WebApp method support varies by client version and platform.
   }
 }
@@ -457,7 +457,7 @@ export function configureClosingConfirmation(webApp, enabled) {
     } else {
       webApp?.disableClosingConfirmation?.();
     }
-  } catch (_error) {
+  } catch {
     // Closing confirmation is client/version dependent.
   }
 }
@@ -469,7 +469,7 @@ export function configureVerticalSwipe(webApp, enabled) {
     } else {
       webApp?.disableVerticalSwipes?.();
     }
-  } catch (_error) {
+  } catch {
     // Swipe behavior is client/version dependent.
   }
 }
@@ -483,7 +483,7 @@ export function showTelegramPopup(options = {}) {
         return;
       }
       webApp.showPopup(options, resolve);
-    } catch (_error) {
+    } catch {
       resolve(null);
     }
   });
@@ -501,7 +501,7 @@ export function showTelegramAlert(message) {
         window.alert(String(message || ''));
       }
       resolve(true);
-    } catch (_error) {
+    } catch {
       resolve(false);
     }
   });
@@ -520,7 +520,7 @@ export function showTelegramConfirm(message) {
         return;
       }
       resolve(true);
-    } catch (_error) {
+    } catch {
       resolve(false);
     }
   });
@@ -549,7 +549,7 @@ export function openTelegramLink(url, options = {}) {
       window.open(target, '_blank', 'noopener,noreferrer');
       return true;
     }
-  } catch (_error) {
+  } catch {
     return false;
   }
 
@@ -569,7 +569,7 @@ export function shareTelegramUrl(url, text = '') {
 export function triggerTelegramImpact(style = 'light') {
   try {
     getTelegramWebApp()?.HapticFeedback?.impactOccurred?.(style);
-  } catch (_error) {
+  } catch {
     // Haptics are best-effort and unavailable in regular browsers.
   }
 }
@@ -577,7 +577,7 @@ export function triggerTelegramImpact(style = 'light') {
 export function triggerTelegramNotification(type = 'success') {
   try {
     getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.(type);
-  } catch (_error) {
+  } catch {
     // Haptics are best-effort and unavailable in regular browsers.
   }
 }

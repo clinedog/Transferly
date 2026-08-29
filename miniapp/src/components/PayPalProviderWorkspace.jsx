@@ -737,7 +737,7 @@ function PayPalOverview({ dashboard, resource }) {
     try {
       await navigator.clipboard.writeText(hostedInvoiceLink);
       toast.success('Hosted PayPal invoice link copied');
-    } catch (_error) {
+    } catch {
       toast.error('Could not copy the hosted PayPal invoice link.');
     }
   }

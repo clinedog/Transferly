@@ -1,4 +1,5 @@
 const express = require('express');
+const config = require('../config');
 
 const {
   createProviderInvoiceController,
@@ -34,12 +35,20 @@ const {
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { requireAuthenticatedUser } = require('../middleware/authenticateRequest');
 const { requireIdempotencyKey } = require('../middleware/requireIdempotencyKey');
+const { AppError } = require('../utils/errors');
 
 const router = express.Router();
 
 router.use(requireAuthenticatedUser);
 router.get('/', asyncHandler(listProvidersController));
 router.get('/readiness', asyncHandler(listProviderReadinessController));
+router.param('provider', (request, _response, next, provider) => {
+  if (config.PAYPAL_ONLY_PRODUCTION_MVP && String(provider || '').trim().toLowerCase() !== 'paypal') {
+    next(new AppError(404, 'PROVIDER_COMING_SOON', 'This provider is coming soon and is not enabled for the current release.'));
+    return;
+  }
+  next();
+});
 router.get('/:provider', asyncHandler(getProviderController));
 router.get('/:provider/readiness', asyncHandler(getProviderReadinessController));
 router.get('/:provider/health', asyncHandler(getProviderHealthController));

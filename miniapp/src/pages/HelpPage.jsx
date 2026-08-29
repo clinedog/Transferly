@@ -50,7 +50,7 @@ export default function HelpPage() {
           </h2>
 
           <div className="space-y-4">
-            {config.helpFAQ.map((faq, index) => (
+            {config.helpFAQ.map((faq) => (
               <div
                 key={faq.id}
                 className="border border-gray-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition"

@@ -18,6 +18,7 @@ const defaults = {
   REDIS_URL: 'redis://127.0.0.1:6379',
   SQLITE_DATABASE_PATH: './data/test.sqlite',
   ADMIN_API_TOKEN: 'admin-test-token',
+  PAYPAL_ONLY_PRODUCTION_MVP: 'false',
   TRANSFERLY_OWNER_TELEGRAM_USER_IDS: '9001003',
   TRANSFERLY_ADMIN_TELEGRAM_USER_IDS: '9001004'
 };

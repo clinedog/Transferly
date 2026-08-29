@@ -31,7 +31,7 @@ export default function ReferralPage() {
       setCopied(true);
       toast.success('Referral link copied');
       setTimeout(() => setCopied(false), 2000);
-    } catch (_error) {
+    } catch {
       toast.error('Failed to copy referral link');
     }
   };

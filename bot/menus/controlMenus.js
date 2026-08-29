@@ -10,6 +10,11 @@ const CONTROL_ACTIONS = Object.freeze({
 
 const CONTROL_LABELS = Object.freeze({
   app: '🚀 Open Transferly',
+  buyPoints: '💰 Buy Points',
+  services: '🧰 Services',
+  orders: '📦 Orders',
+  wallet: '👛 Wallet',
+  support: '❓ Support',
   account: '👤 Account',
   notifications: '🔔 Notifications',
   settings: '⚙️ Settings',
@@ -35,6 +40,23 @@ function buildPrimaryControlRows() {
     [
       { type: 'callback', label: CONTROL_LABELS.settings, action: CONTROL_ACTIONS.SETTINGS },
       { type: 'callback', label: CONTROL_LABELS.help, action: CONTROL_ACTIONS.HELP }
+    ]
+  ];
+}
+
+function buildStartControlRows() {
+  return [
+    [{ type: 'miniapp', label: CONTROL_LABELS.app, section: 'dashboard' }],
+    [
+      { type: 'miniapp', label: CONTROL_LABELS.buyPoints, section: 'wallet' },
+      { type: 'miniapp', label: CONTROL_LABELS.services, section: 'services' }
+    ],
+    [
+      { type: 'miniapp', label: CONTROL_LABELS.orders, section: 'orders' },
+      { type: 'miniapp', label: CONTROL_LABELS.wallet, section: 'wallet' }
+    ],
+    [
+      { type: 'miniapp', label: CONTROL_LABELS.support, section: 'support' }
     ]
   ];
 }
@@ -74,5 +96,6 @@ module.exports = {
   CONTROL_COMMANDS,
   CONTROL_LABELS,
   applyControlRows,
-  buildPrimaryControlRows
+  buildPrimaryControlRows,
+  buildStartControlRows
 };

@@ -297,6 +297,7 @@ test('migration creates and verifies required operational tables', async () => {
   assert.equal(generatedAssetColumnNames.has('expires_at'), true);
 
   const seededServices = await db.all('SELECT slug, status FROM services ORDER BY display_order ASC');
+  assert.ok(seededServices.some((service) => service.slug === 'paypal' && service.status === 'active'));
   assert.ok(seededServices.some((service) => service.slug === 'transaction-record' && service.status === 'active'));
   assert.ok(seededServices.some((service) => service.slug === 'faker-data' && service.status === 'sandbox'));
   assert.ok(seededServices.some((service) => service.slug === 'opay' && service.status === 'disabled'));

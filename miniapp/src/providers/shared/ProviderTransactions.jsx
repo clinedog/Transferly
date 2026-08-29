@@ -17,7 +17,7 @@
  */
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { TransactionItem, LoadingSkeletonCard, StatusBadge } from '../../components/ui';
+import { TransactionItem, LoadingSkeletonCard } from '../../components/ui';
 
 function EmptyState({ providerName }) {
   return (

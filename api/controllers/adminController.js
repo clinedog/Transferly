@@ -575,6 +575,15 @@ async function getAdminFundingRequestController(request, response) {
   response.json(await pointsFundingService.getAdminFundingRequest(params.id));
 }
 
+async function getAdminFundingEvidenceController(request, response) {
+  const params = adminFundingRequestParamsSchema.parse(request.params || {});
+  const evidence = await pointsFundingService.getEvidenceContentForAdmin(params.id);
+  response.setHeader('Content-Type', evidence.mimeType);
+  response.setHeader('Content-Disposition', `attachment; filename="${evidence.fileName.replace(/"/g, '')}"`);
+  response.setHeader('Cache-Control', 'private, no-store');
+  response.send(evidence.content);
+}
+
 async function markAdminFundingRequestUnderReviewController(request, response) {
   const params = adminFundingRequestParamsSchema.parse(request.params || {});
   response.json(await pointsFundingService.markUnderReview({
@@ -1031,6 +1040,7 @@ module.exports = {
   deleteAdminInvoiceTemplateController,
   deleteAdminTestimonialController,
   getAdminFundingRequestController,
+  getAdminFundingEvidenceController,
   getAdminFinanceOverviewController,
   getAdminUserRiskProfileController,
   getAdminUserFinanceProfileController,

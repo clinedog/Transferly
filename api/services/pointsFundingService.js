@@ -1,9 +1,10 @@
-const { randomBytes } = require('node:crypto');
+const { createHash, randomBytes } = require('node:crypto');
 
 const config = require('../config');
 const { transaction } = require('../db');
 const { idempotencyRepository } = require('../repositories/idempotencyRepository');
 const { pointsFundingRepository } = require('../repositories/pointsFundingRepository');
+const { notificationRepository } = require('../repositories/notificationRepository');
 const { userRepository } = require('../repositories/userRepository');
 const {
   AUDIT_ACTOR_TYPE,
@@ -14,6 +15,7 @@ const {
 } = require('../utils/constants');
 const { AppError } = require('../utils/errors');
 const { hashCanonicalJson } = require('../utils/canonicalJson');
+const { createLocalPrivateStorageAdapter } = require('../adapters/storageAdapter');
 const { auditLogService } = require('./auditLogService');
 const { pointLedgerService } = require('./pointLedgerService');
 const { riskEngineService } = require('./riskEngineService');
@@ -27,6 +29,19 @@ const ALLOWED_EVIDENCE_MIME_TYPES = Object.freeze([
 
 const MAX_EVIDENCE_BYTES = 8 * 1024 * 1024;
 const CREATE_FUNDING_OPERATION = 'points_funding.create';
+const evidenceStorageAdapter = createLocalPrivateStorageAdapter({
+  maxAssetBytes: MAX_EVIDENCE_BYTES,
+  mimeExtensions: {
+    'image/webp': 'webp'
+  }
+});
+
+const FILE_SIGNATURES = Object.freeze({
+  'image/jpeg': (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
+  'image/png': (buffer) => buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/webp': (buffer) => buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP',
+  'application/pdf': (buffer) => buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-'
+});
 
 function expectedAmountMinorForPoints(points) {
   return Number(points) * Number(config.POINTS_TO_NAIRA_RATE) * 100;
@@ -122,7 +137,8 @@ function presentFundingRequest(request, { admin = false } = {}) {
     user_note: request.userNote,
     evidence: request.evidenceFileId || request.evidenceStorageKey ? {
       file_id: request.evidenceFileId,
-      storage_key: admin ? request.evidenceStorageKey : undefined,
+      download_url: `/api/user/me/points/funding/requests/${encodeURIComponent(request.id)}/evidence`,
+      admin_download_url: admin ? `/api/admin/points-funding/${encodeURIComponent(request.id)}/evidence` : undefined,
       metadata: request.evidenceMetadata || {}
     } : null,
     status: request.status,
@@ -266,6 +282,14 @@ async function createFundingRequest({ userId, packageId, userNote, idempotencyKe
       client
     );
 
+    await notificationRepository.createNotification({
+      userId,
+      type: 'funding.created',
+      title: 'Funding request created',
+      message: `${request.publicReference} is waiting for payment evidence.`,
+      data: { funding_request_id: request.id, reference: request.publicReference, deep_link: `/miniapp/wallet?funding=${request.id}` }
+    }, client);
+
     await riskEngineService.evaluateEvent(
       {
         eventType: 'FUNDING_CREATED',
@@ -317,6 +341,109 @@ function validateEvidence(evidence = {}) {
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_EVIDENCE_BYTES) {
     throw new AppError(400, 'PAYMENT_EVIDENCE_SIZE_INVALID', 'Payment evidence file size is invalid.');
   }
+}
+
+function sanitizeEvidenceFileName(fileName) {
+  const baseName = String(fileName || 'payment-evidence')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/[^a-zA-Z0-9._ -]/g, '_')
+    .trim()
+    .slice(0, 120);
+  return baseName || 'payment-evidence';
+}
+
+function decodeEvidenceContent(contentBase64) {
+  const normalized = String(contentBase64 || '').trim();
+  if (!normalized || !/^[A-Za-z0-9+/=\r\n]+$/.test(normalized)) {
+    throw new AppError(400, 'PAYMENT_EVIDENCE_CONTENT_INVALID', 'Payment evidence content must be base64 encoded.');
+  }
+  const buffer = Buffer.from(normalized, 'base64');
+  if (!buffer.length || buffer.toString('base64').replace(/=+$/, '') !== normalized.replace(/[\r\n]/g, '').replace(/=+$/, '')) {
+    throw new AppError(400, 'PAYMENT_EVIDENCE_CONTENT_INVALID', 'Payment evidence content must be valid base64.');
+  }
+  if (buffer.length > MAX_EVIDENCE_BYTES) {
+    throw new AppError(413, 'PAYMENT_EVIDENCE_SIZE_INVALID', 'Payment evidence file size is invalid.');
+  }
+  return buffer;
+}
+
+function assertEvidenceContentMatchesMime(buffer, mimeType) {
+  const check = FILE_SIGNATURES[mimeType];
+  if (!check || !check(buffer)) {
+    throw new AppError(400, 'PAYMENT_EVIDENCE_CONTENT_MISMATCH', 'Payment evidence content does not match its declared file type.');
+  }
+}
+
+async function uploadAndSubmitEvidence({ userId, requestId, fileName, mimeType, contentBase64, userTransactionReference, userNote }) {
+  const normalizedMimeType = String(mimeType || '').trim().toLowerCase();
+  if (!ALLOWED_EVIDENCE_MIME_TYPES.includes(normalizedMimeType)) {
+    throw new AppError(400, 'PAYMENT_EVIDENCE_TYPE_UNSUPPORTED', 'Unsupported payment evidence file type.');
+  }
+  const content = decodeEvidenceContent(contentBase64);
+  assertEvidenceContentMatchesMime(content, normalizedMimeType);
+  const safeFileName = sanitizeEvidenceFileName(fileName);
+  const contentHash = createHash('sha256').update(content).digest('hex');
+  const existingRequest = await pointsFundingRepository.findRequestById(requestId);
+  if (!existingRequest || existingRequest.userId !== userId) {
+    throw new AppError(404, 'FUNDING_REQUEST_NOT_FOUND', 'Funding request not found.');
+  }
+  if (existingRequest.status === POINTS_FUNDING_STATUS.PAYMENT_REPORTED) {
+    if (existingRequest.evidenceMetadata?.sha256 === contentHash) {
+      return { funding_request: presentFundingRequest(existingRequest), idempotent: true };
+    }
+    throw new AppError(409, 'FUNDING_EVIDENCE_ALREADY_SUBMITTED', 'Payment evidence has already been submitted for this funding request.');
+  }
+
+  const stored = await evidenceStorageAdapter.write({
+    content,
+    mimeType: normalizedMimeType
+  });
+
+  try {
+    return await submitEvidence({
+      userId,
+      requestId,
+      evidence: {
+        fileId: stored.checksum,
+        storageKey: stored.storageKey,
+        originalName: safeFileName,
+        mimeType: stored.mimeType,
+        sizeBytes: stored.fileSize,
+        sha256: stored.checksum
+      },
+      userTransactionReference,
+      userNote
+    });
+  } catch (error) {
+    await evidenceStorageAdapter.delete(stored.storageKey).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function getEvidenceContentForUser({ userId, requestId }) {
+  const request = await pointsFundingRepository.findRequestById(requestId);
+  if (!request || request.userId !== userId || !request.evidenceStorageKey) {
+    throw new AppError(404, 'FUNDING_EVIDENCE_NOT_FOUND', 'Funding evidence not found.');
+  }
+  const metadata = request.evidenceMetadata || {};
+  const content = await evidenceStorageAdapter.read(request.evidenceStorageKey, {
+    fileSize: metadata.size_bytes,
+    checksum: metadata.sha256
+  });
+  return {
+    content: content.content,
+    mimeType: metadata.mime_type || 'application/octet-stream',
+    fileName: sanitizeEvidenceFileName(metadata.original_name || 'payment-evidence')
+  };
+}
+
+async function getEvidenceContentForAdmin(requestId) {
+  const request = await pointsFundingRepository.findRequestById(requestId);
+  if (!request || !request.evidenceStorageKey) {
+    throw new AppError(404, 'FUNDING_EVIDENCE_NOT_FOUND', 'Funding evidence not found.');
+  }
+  return getEvidenceContentForUser({ userId: request.userId, requestId });
 }
 
 async function submitEvidence({ userId, requestId, evidence, userTransactionReference, userNote }) {
@@ -382,6 +509,14 @@ async function submitEvidence({ userId, requestId, evidence, userTransactionRefe
       client
     );
 
+    await notificationRepository.createNotification({
+      userId,
+      type: 'funding.submitted',
+      title: 'Funding submitted',
+      message: `${request.publicReference} is under review. Do not submit another payment.`,
+      data: { funding_request_id: request.id, reference: request.publicReference, deep_link: `/miniapp/wallet?funding=${request.id}` }
+    }, client);
+
     return { funding_request: presentFundingRequest(updated) };
   });
 }
@@ -415,23 +550,43 @@ async function markUnderReview({ requestId, adminActorId }) {
 }
 
 async function rejectFundingRequest({ requestId, adminActorId, rejectionReason, adminNote }) {
-  return adminTransition({
-    requestId,
-    adminActorId,
-    nextStatus: POINTS_FUNDING_STATUS.REJECTED,
-    action: 'points_funding.rejected',
-    rejectionReason,
-    adminNote
+  return transaction(async (client) => {
+    const result = await adminTransition({
+      requestId,
+      adminActorId,
+      nextStatus: POINTS_FUNDING_STATUS.REJECTED,
+      action: 'points_funding.rejected',
+      rejectionReason,
+      adminNote
+    }, client);
+    await notificationRepository.createNotification({
+      userId: result.funding_request.user_id,
+      type: 'funding.rejected',
+      title: 'Funding needs attention',
+      message: rejectionReason,
+      data: { funding_request_id: requestId, reference: result.funding_request.public_reference, deep_link: `/miniapp/wallet?funding=${requestId}` }
+    }, client);
+    return result;
   });
 }
 
 async function requestMoreInformation({ requestId, adminActorId, adminNote }) {
-  return adminTransition({
-    requestId,
-    adminActorId,
-    nextStatus: POINTS_FUNDING_STATUS.NEEDS_MORE_INFORMATION,
-    action: 'points_funding.more_information_requested',
-    adminNote
+  return transaction(async (client) => {
+    const result = await adminTransition({
+      requestId,
+      adminActorId,
+      nextStatus: POINTS_FUNDING_STATUS.NEEDS_MORE_INFORMATION,
+      action: 'points_funding.more_information_requested',
+      adminNote
+    }, client);
+    await notificationRepository.createNotification({
+      userId: result.funding_request.user_id,
+      type: 'funding.information_required',
+      title: 'More funding information required',
+      message: adminNote,
+      data: { funding_request_id: requestId, reference: result.funding_request.public_reference, deep_link: `/miniapp/wallet?funding=${requestId}` }
+    }, client);
+    return result;
   });
 }
 
@@ -481,8 +636,8 @@ async function assignFundingRequest({ requestId, adminActorId, assignedTo }) {
   });
 }
 
-async function adminTransition({ requestId, adminActorId, nextStatus, action, rejectionReason, adminNote }) {
-  return transaction(async (client) => {
+async function adminTransition({ requestId, adminActorId, nextStatus, action, rejectionReason, adminNote }, transactionClient) {
+  const execute = async (client) => {
     const request = await pointsFundingRepository.findRequestById(requestId, client);
     if (!request) {
       throw new AppError(404, 'FUNDING_REQUEST_NOT_FOUND', 'Funding request not found.');
@@ -513,7 +668,8 @@ async function adminTransition({ requestId, adminActorId, nextStatus, action, re
       client
     );
     return { funding_request: presentFundingRequest(updated, { admin: true }) };
-  });
+  };
+  return transactionClient ? execute(transactionClient) : transaction(execute);
 }
 
 async function approveFundingRequest({ requestId, adminActorId, adminNote, idempotencyKey: _idempotencyKey }) {
@@ -579,6 +735,13 @@ async function approveFundingRequest({ requestId, adminActorId, adminNote, idemp
         },
         client
       );
+      await notificationRepository.createNotification({
+        userId: request.userId,
+        type: 'points.credited',
+        title: 'Points added',
+        message: `${request.requestedPoints.toLocaleString()} points were credited. New balance: ${ledgerResult.balance.toLocaleString()} points.`,
+        data: { funding_request_id: request.id, reference: request.publicReference, balance: ledgerResult.balance, deep_link: '/miniapp/wallet' }
+      }, client);
     }
 
     return {
@@ -606,12 +769,15 @@ module.exports = {
     getAdminFundingRequest,
     getFundingConfig,
     getOperationsMetrics,
+    getEvidenceContentForAdmin,
+    getEvidenceContentForUser,
     listAdminFundingRequests,
     listUserFundingRequests,
     markUnderReview,
     presentFundingRequest,
     requestMoreInformation,
     rejectFundingRequest,
-    submitEvidence
+    submitEvidence,
+    uploadAndSubmitEvidence
   }
 };

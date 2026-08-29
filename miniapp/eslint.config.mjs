@@ -20,6 +20,7 @@ const browserGlobals = {
   cancelAnimationFrame: 'readonly',
   clearInterval: 'readonly',
   clearTimeout: 'readonly',
+  confirm: 'readonly',
   console: 'readonly',
   crypto: 'readonly',
   document: 'readonly',

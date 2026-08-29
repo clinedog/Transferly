@@ -5,11 +5,10 @@ import {
   Bot,
   CheckCircle2,
   ChevronLeft,
-  Clock3,
   Copy,
+  CreditCard,
   HelpCircle,
   Home,
-  Mail,
   Maximize2,
   Megaphone,
   MessageCircle,
@@ -32,20 +31,20 @@ import AuthErrorRecoveryPanel from './AuthErrorRecoveryPanel';
 const MiniAppCommandPalette = React.lazy(() => import('./miniapp/MiniAppCommandPalette'));
 
 const railItems = [
-  { label: 'Wallet Home', to: '/miniapp', icon: Home },
+  { label: 'Home', to: '/miniapp', icon: Home },
   { label: 'Services', to: '/miniapp/services', icon: Sparkles },
-  { label: 'Vault', to: '/miniapp/vault', icon: Clock3 },
-  { label: 'Studio', to: '/miniapp/studio', icon: Mail },
-  { label: 'Referral', to: '/miniapp/profile', icon: Users },
+  { label: 'Orders', to: '/miniapp/orders', icon: CreditCard },
+  { label: 'Wallet', to: '/miniapp/wallet', icon: WalletCards },
+  { label: 'Account', to: '/miniapp/profile', icon: Users },
   { label: 'Settings', to: '/miniapp/settings', icon: Settings }
 ];
 
 const bottomItems = [
-  { label: 'Wallet', to: '/miniapp', icon: Home },
+  { label: 'Home', to: '/miniapp', icon: Home },
   { label: 'Services', to: '/miniapp/services', icon: Sparkles },
-  { label: 'Studio', to: '/miniapp/studio', icon: Mail },
-  { label: 'Points', to: '/miniapp/wallet', icon: WalletCards },
-  { label: 'Settings', to: '/miniapp/settings', icon: Settings }
+  { label: 'Orders', to: '/miniapp/orders', icon: CreditCard },
+  { label: 'Wallet', to: '/miniapp/wallet', icon: WalletCards },
+  { label: 'Account', to: '/miniapp/profile', icon: Users }
 ];
 
 const COMMUNITY_MODAL_KEY = 'transferly_telegram_modal_dismissed';
@@ -184,7 +183,7 @@ export default function MiniAppShell({
       await navigator.clipboard.writeText(referralLink);
       telegram.notify('success');
       toast.success('Referral link copied');
-    } catch (_error) {
+    } catch {
       telegram.notify('error');
       toast.error('Unable to copy referral link');
     }
@@ -194,7 +193,7 @@ export default function MiniAppShell({
     setShowCommunityModal(false);
     try {
       window.localStorage.setItem(COMMUNITY_MODAL_KEY, 'true');
-    } catch (_error) {
+    } catch {
       // Ignore storage restrictions in embedded webviews.
     }
   };
@@ -205,7 +204,7 @@ export default function MiniAppShell({
 
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, nextMode);
-    } catch (_error) {
+    } catch {
       // Ignore storage restrictions in embedded webviews.
     }
 
@@ -246,7 +245,7 @@ export default function MiniAppShell({
 
     try {
       setShowCommunityModal(window.localStorage.getItem(COMMUNITY_MODAL_KEY) !== 'true');
-    } catch (_error) {
+    } catch {
       setShowCommunityModal(true);
     }
   }, [isRoot]);
@@ -612,7 +611,7 @@ export default function MiniAppShell({
                     className="miniapp-pressable miniapp-touch-target flex items-center justify-center gap-2 rounded-[20px] border border-[var(--miniapp-border-color)] bg-[var(--miniapp-panel-bg)] px-5 py-3 text-sm font-black text-[var(--miniapp-shell-text)]"
                   >
                     <CheckCircle2 size={17} aria-hidden="true" />
-                    I've already joined
+                    I&apos;ve already joined
                   </button>
                 </div>
               </section>

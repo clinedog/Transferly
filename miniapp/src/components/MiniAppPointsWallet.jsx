@@ -28,8 +28,16 @@ function statusLabel(status) {
   return String(status || 'pending').replace(/_/g, ' ');
 }
 
+function normalizeStatus(status) {
+  return String(status || '').trim().toUpperCase();
+}
+
+function titleCaseStatus(status) {
+  return statusLabel(status).toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function orderStatusMeta(status) {
-  const key = String(status || 'pending').toLowerCase();
+  const key = normalizeStatus(status).toLowerCase();
 
   if (key === 'payment_instructions') {
     return {
@@ -77,11 +85,52 @@ function orderStatusMeta(status) {
   }
 
   return {
-    label: statusLabel(status),
+    label: titleCaseStatus(status),
     body: 'Order status is being synchronized.',
     icon: Clock3,
     tone: 'info'
   };
+}
+
+const fundingProgressSteps = Object.freeze([
+  { key: 'created', label: 'Request created' },
+  { key: 'paid', label: 'Payment made' },
+  { key: 'review', label: 'Verification' },
+  { key: 'credited', label: 'Points credited' }
+]);
+
+function getFundingProgress(status) {
+  const key = normalizeStatus(status);
+  if (key === 'POINTS_CREDITED') return 4;
+  if (['PAYMENT_REPORTED', 'UNDER_REVIEW', 'APPROVED', 'MANUAL_REVIEW', 'NEEDS_MORE_INFORMATION'].includes(key)) return 3;
+  if (key === 'PAYMENT_INSTRUCTIONS') return 1;
+  return 0;
+}
+
+function canSubmitEvidence(status) {
+  return ['PAYMENT_INSTRUCTIONS', 'NEEDS_MORE_INFORMATION'].includes(normalizeStatus(status));
+}
+
+function requestAmount(request) {
+  return request.display_amount || formatMinor(request.expected_amount_minor, request.currency);
+}
+
+function evidenceSummary(policy) {
+  const types = Array.isArray(policy?.allowed_mime_types) ? policy.allowed_mime_types : [];
+  const maxBytes = Number(policy?.max_size_bytes || policy?.max_bytes || 0);
+  const maxMb = maxBytes ? `${Math.floor(maxBytes / (1024 * 1024))}MB` : 'configured limit';
+  const labels = types.map((type) => type.replace('image/', '').replace('application/', '').toUpperCase());
+
+  return labels.length ? `${labels.join(', ')} up to ${maxMb}` : `Screenshot or receipt up to ${maxMb}`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || '').split(',').pop() || '');
+    reader.onerror = () => reject(new Error('Unable to read selected file.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatDate(value) {
@@ -147,7 +196,45 @@ function PackageCard({ pack, active, onSelect }) {
   );
 }
 
-function FundingRequestRow({ request }) {
+function FundingProgress({ status }) {
+  const progress = getFundingProgress(status);
+
+  return (
+    <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={`Funding progress: ${progress} of ${fundingProgressSteps.length} steps complete`}>
+      {fundingProgressSteps.map((step, index) => {
+        const complete = index < progress;
+
+        return (
+          <li
+            key={step.key}
+            className={`rounded-[16px] px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] ${
+              complete
+                ? 'bg-[color-mix(in_srgb,var(--tg-button-color)_18%,var(--tg-section-bg-color))] text-[var(--tg-text-color)]'
+                : 'bg-[var(--tg-section-bg-color)] text-[var(--tg-hint-color)]'
+            }`}
+          >
+            <span className="sr-only">Step {index + 1}: </span>
+            {step.label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function FundingRequestRow({
+  request,
+  onCopy,
+  evidencePolicy,
+  selectedEvidenceFile,
+  evidenceReference,
+  evidenceNote,
+  uploading,
+  onEvidenceFileChange,
+  onEvidenceReferenceChange,
+  onEvidenceNoteChange,
+  onEvidenceUpload
+}) {
   const meta = orderStatusMeta(request.status);
   const StatusIcon = meta.icon;
   const statusTone = meta.tone === 'danger'
@@ -155,12 +242,15 @@ function FundingRequestRow({ request }) {
     : meta.tone === 'success'
       ? 'text-[var(--tg-button-color)]'
       : 'text-[var(--tg-hint-color)]';
+  const reference = request.public_reference || request.payment_reference || request.id;
+  const destination = request.destination_snapshot || {};
+  const amount = requestAmount(request);
 
   return (
-    <article className="rounded-[24px] bg-[var(--tg-secondary-bg-color)] p-4">
+    <article className="rounded-[24px] bg-[var(--tg-secondary-bg-color)] p-4" aria-label={`Funding request ${reference}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-[var(--tg-text-color)]">{request.public_reference || request.id}</p>
+          <p className="truncate text-sm font-black text-[var(--tg-text-color)]">{reference}</p>
           <p className={`mt-1 inline-flex items-center gap-1.5 text-xs font-black capitalize ${statusTone}`}>
             <StatusIcon size={13} />
             {meta.label}
@@ -170,17 +260,156 @@ function FundingRequestRow({ request }) {
           {Number(request.requested_points || 0).toLocaleString()} pts
         </span>
       </div>
-      <div className="mt-4 grid gap-2 text-xs font-bold text-[var(--tg-subtitle-text-color)] sm:grid-cols-2">
-        <span>{request.display_amount || formatMinor(request.expected_amount_minor, request.currency)}</span>
+      <FundingProgress status={request.status} />
+      <div className="mt-4 grid gap-2 text-xs font-bold text-[var(--tg-subtitle-text-color)] sm:grid-cols-3">
+        <span>{amount}</span>
         <span>{formatDate(request.created_at)}</span>
+        <span>{request.payment_method ? titleCaseStatus(request.payment_method) : 'Manual Bank Transfer'}</span>
       </div>
       <p className="mt-3 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">{meta.body}</p>
+      {canSubmitEvidence(request.status) ? (
+        <div className="mt-3 rounded-[16px] bg-[var(--tg-section-bg-color)] p-3 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">
+          <p className="font-black text-[var(--tg-text-color)]">Next step: submit payment evidence</p>
+          <p className="mt-1">
+            Pay exactly {amount}, include reference {reference}, then upload your receipt or screenshot here. Uploading evidence starts review only; it never credits points by itself.
+          </p>
+          <div className="mt-3 space-y-3">
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--tg-hint-color)]">Payment Evidence</span>
+              <input
+                type="file"
+                accept={(evidencePolicy?.allowed_mime_types || []).join(',') || 'image/jpeg,image/png,image/webp,application/pdf'}
+                onChange={(event) => onEvidenceFileChange?.(request.id, event.target.files?.[0] || null)}
+                className="mt-2 block w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] p-3 text-xs font-bold text-[var(--tg-text-color)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--tg-button-color)] file:px-3 file:py-2 file:text-xs file:font-black file:text-[var(--tg-button-text-color)]"
+              />
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--tg-hint-color)]">Bank Reference</span>
+                <input
+                  type="text"
+                  value={evidenceReference || ''}
+                  onChange={(event) => onEvidenceReferenceChange?.(request.id, event.target.value)}
+                  placeholder="Optional transaction ID"
+                  className="mt-2 w-full rounded-[16px] border border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] px-3 py-3 text-xs font-bold text-[var(--tg-text-color)] outline-none focus:border-[var(--tg-button-color)]"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.13em] text-[var(--tg-hint-color)]">Note</span>
+                <input
+                  type="text"
+                  value={evidenceNote || ''}
+                  onChange={(event) => onEvidenceNoteChange?.(request.id, event.target.value)}
+                  placeholder="Optional note"
+                  className="mt-2 w-full rounded-[16px] border border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] px-3 py-3 text-xs font-bold text-[var(--tg-text-color)] outline-none focus:border-[var(--tg-button-color)]"
+                />
+              </label>
+            </div>
+            {selectedEvidenceFile ? (
+              <p className="rounded-[14px] bg-[var(--tg-secondary-bg-color)] p-2 text-[11px] font-bold text-[var(--tg-text-color)]">
+                Selected: {selectedEvidenceFile.name} · {(selectedEvidenceFile.size / 1024 / 1024).toFixed(2)}MB
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onEvidenceUpload?.(request)}
+              disabled={!selectedEvidenceFile || uploading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[16px] bg-[var(--tg-button-color)] px-4 py-3 text-xs font-black text-[var(--tg-button-text-color)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {uploading ? 'Uploading evidence…' : 'Upload Evidence'}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {request.admin_note || request.rejection_reason ? (
         <p className="mt-3 rounded-[16px] bg-[var(--tg-section-bg-color)] p-3 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">
           {request.rejection_reason || request.admin_note}
         </p>
       ) : null}
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => onCopy(reference, 'Funding reference')}
+          className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 py-2 text-xs font-black text-[var(--tg-text-color)]"
+        >
+          <Copy size={14} />
+          Copy reference
+        </button>
+        <button
+          type="button"
+          onClick={() => onCopy(destination.account_number || request.payment_reference, destination.account_number ? 'Account number' : 'Payment reference')}
+          className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 py-2 text-xs font-black text-[var(--tg-text-color)]"
+        >
+          <Copy size={14} />
+          Copy pay detail
+        </button>
+        <Link
+          to="/miniapp/support"
+          className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-[var(--tg-button-color)] px-3 py-2 text-xs font-black text-[var(--tg-button-text-color)]"
+        >
+          Support handoff
+          <ArrowRight size={14} />
+        </Link>
+      </div>
     </article>
+  );
+}
+
+function FundingStatusCenter({ requests, evidencePolicy, onCopy, evidenceUploads }) {
+  const activeRequest = requests.find((request) => ['PAYMENT_INSTRUCTIONS', 'PAYMENT_REPORTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION'].includes(request.status)) || requests[0] || null;
+  const renderRequest = (request) => {
+    const draft = evidenceUploads?.drafts?.[request.id] || {};
+    return (
+      <FundingRequestRow
+        key={request.id}
+        request={request}
+        onCopy={onCopy}
+        evidencePolicy={evidencePolicy}
+        selectedEvidenceFile={draft.file || null}
+        evidenceReference={draft.reference || ''}
+        evidenceNote={draft.note || ''}
+        uploading={evidenceUploads?.uploadingEvidenceId === request.id}
+        onEvidenceFileChange={evidenceUploads?.onEvidenceFileChange}
+        onEvidenceReferenceChange={evidenceUploads?.onEvidenceReferenceChange}
+        onEvidenceNoteChange={evidenceUploads?.onEvidenceNoteChange}
+        onEvidenceUpload={evidenceUploads?.onEvidenceUpload}
+      />
+    );
+  };
+
+  return (
+    <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm" aria-labelledby="funding-status-heading">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Funding status center</p>
+          <h3 id="funding-status-heading" className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--tg-text-color)]">Track verification</h3>
+          <p className="mt-2 text-sm font-bold leading-6 text-[var(--tg-subtitle-text-color)]">
+            Points are credited only after finance approval and a successful ledger credit. Screenshot submission alone never changes your balance.
+          </p>
+        </div>
+        <Clock3 size={24} className="shrink-0 text-[var(--tg-button-color)]" />
+      </div>
+
+      <div className="mt-4 rounded-[20px] bg-[var(--tg-secondary-bg-color)] p-4 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">
+        <p className="font-black text-[var(--tg-text-color)]">Evidence policy</p>
+        <p className="mt-1">{evidenceSummary(evidencePolicy)}. Keep your funding reference visible where possible.</p>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {activeRequest ? (
+          renderRequest(activeRequest)
+        ) : (
+          <div className="rounded-[24px] bg-[var(--tg-secondary-bg-color)] p-5 text-center">
+            <CheckCircle2 className="mx-auto text-[var(--tg-button-color)]" size={28} />
+            <p className="mt-3 text-sm font-black text-[var(--tg-text-color)]">No funding requests yet</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[var(--tg-hint-color)]">
+              Create a backend-backed request to receive an exact amount, unique reference, and review status.
+            </p>
+          </div>
+        )}
+        {requests.filter((request) => request.id !== activeRequest?.id).slice(0, 3).map(renderRequest)}
+      </div>
+    </section>
   );
 }
 
@@ -241,6 +470,7 @@ export default function MiniAppPointsWallet() {
     profile,
     pointsFundingConfig,
     pointsFundingRequests,
+    uploadPointsFundingEvidence,
     user
   } = useAppContext();
   const {
@@ -250,8 +480,11 @@ export default function MiniAppPointsWallet() {
   } = useTelegramMiniApp();
   const packages = pointsFundingConfig?.packages || [];
   const paymentDestination = pointsFundingConfig?.payment_destination || null;
+  const evidencePolicy = pointsFundingConfig?.evidence_policy || null;
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [evidenceDrafts, setEvidenceDrafts] = useState({});
+  const [uploadingEvidenceId, setUploadingEvidenceId] = useState('');
   const [operationState, setOperationState] = useState({ status: 'idle' });
 
   const selectedPackage = packages.find((pack) => pack.id === selectedPackageId) || packages[0] || null;
@@ -330,7 +563,7 @@ export default function MiniAppPointsWallet() {
       });
       toast.success('Funding request created');
       notify('success');
-    } catch (_error) {
+    } catch {
       setOperationState({
         status: 'retry',
         title: 'Funding request was not created',
@@ -367,9 +600,88 @@ export default function MiniAppPointsWallet() {
       await navigator.clipboard.writeText(String(value));
       toast.success(`${label} copied`);
       notify('success');
-    } catch (_error) {
+    } catch {
       toast.error(`Unable to copy ${label.toLowerCase()}`);
       notify('error');
+    }
+  };
+
+  const updateEvidenceDraft = (requestId, updates) => {
+    setEvidenceDrafts((previous) => ({
+      ...previous,
+      [requestId]: {
+        ...(previous[requestId] || {}),
+        ...updates
+      }
+    }));
+  };
+
+  const selectEvidenceFile = (requestId, file) => {
+    const allowedTypes = evidencePolicy?.allowed_mime_types || [];
+    const maxBytes = Number(evidencePolicy?.max_size_bytes || evidencePolicy?.max_bytes || 0);
+    if (!file) {
+      updateEvidenceDraft(requestId, { file: null });
+      return;
+    }
+    if (allowedTypes.length && !allowedTypes.includes(file.type)) {
+      toast.error('Unsupported evidence file type');
+      notify('error');
+      return;
+    }
+    if (maxBytes && file.size > maxBytes) {
+      toast.error(`Evidence must be ${Math.floor(maxBytes / 1024 / 1024)}MB or smaller`);
+      notify('error');
+      return;
+    }
+    updateEvidenceDraft(requestId, { file });
+  };
+
+  const uploadEvidence = async (request) => {
+    const draft = evidenceDrafts[request.id] || {};
+    if (!draft.file || uploadingEvidenceId) return;
+    setUploadingEvidenceId(request.id);
+    setOperationState({
+      status: 'loading',
+      title: 'Uploading payment evidence',
+      description: 'Transferly is storing your evidence privately before finance review.'
+    });
+    try {
+      const contentBase64 = await fileToBase64(draft.file);
+      const result = await uploadPointsFundingEvidence(request.id, {
+        fileName: draft.file.name,
+        mimeType: draft.file.type,
+        contentBase64,
+        userTransactionReference: draft.reference || '',
+        userNote: draft.note || ''
+      });
+      if (!result.success) {
+        setOperationState({
+          status: 'retry',
+          title: 'Evidence upload failed',
+          description: result.message || 'Your points were not credited. Retry the upload or contact support.'
+        });
+        toast.error(result.message || 'Evidence upload failed');
+        notify('error');
+        return;
+      }
+      setEvidenceDrafts((previous) => ({ ...previous, [request.id]: {} }));
+      setOperationState({
+        status: 'success',
+        title: 'Evidence submitted for review',
+        description: `${result.fundingRequest?.public_reference || request.public_reference} is under review. You do not need to submit another payment.`
+      });
+      toast.success('Evidence submitted for review');
+      notify('success');
+    } catch {
+      setOperationState({
+        status: 'retry',
+        title: 'Evidence upload failed',
+        description: 'Your points were not credited. Check your connection and retry the upload.'
+      });
+      toast.error('Evidence upload failed');
+      notify('error');
+    } finally {
+      setUploadingEvidenceId('');
     }
   };
 
@@ -515,45 +827,30 @@ export default function MiniAppPointsWallet() {
         ) : null}
       </section>
 
-      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Recent funding</p>
-            <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--tg-text-color)]">Funding history</h3>
-          </div>
-          <Clock3 size={24} className="text-[var(--tg-button-color)]" />
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {latestRequests.length ? (
-            latestRequests.map((request) => (
-              <FundingRequestRow key={request.id} request={request} />
-            ))
-          ) : (
-            <div className="rounded-[24px] bg-[var(--tg-secondary-bg-color)] p-5 text-center">
-              <CheckCircle2 className="mx-auto text-[var(--tg-button-color)]" size={28} />
-              <p className="mt-3 text-sm font-black text-[var(--tg-text-color)]">No funding requests yet</p>
-              <p className="mt-1 text-xs font-bold leading-5 text-[var(--tg-hint-color)]">
-                Your next points funding request will appear here with verification status.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Link to="/miniapp/orders" className="flex items-center justify-center gap-2 rounded-[20px] bg-[var(--tg-secondary-bg-color)] px-5 py-3 text-sm font-black text-[var(--tg-text-color)] shadow-sm">
-            Service orders
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
+      <FundingStatusCenter
+        requests={latestRequests}
+        evidencePolicy={evidencePolicy}
+        onCopy={copyText}
+        evidenceUploads={{
+          drafts: evidenceDrafts,
+          uploadingEvidenceId,
+          onEvidenceFileChange: selectEvidenceFile,
+          onEvidenceReferenceChange: (requestId, reference) => updateEvidenceDraft(requestId, { reference }),
+          onEvidenceNoteChange: (requestId, note) => updateEvidenceDraft(requestId, { note }),
+          onEvidenceUpload: uploadEvidence
+        }}
+      />
 
       <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
         <div className="grid gap-3 sm:grid-cols-3">
-          <PillStat label="Wallet record cost" value={`${Number(config?.bank_slip_cost || 10).toLocaleString()} pts`} tone="accent" />
-          <PillStat label="Notification cost" value={`${Number(config?.email_receipt_cost || 5).toLocaleString()} pts`} />
+          <PillStat label="Service action cost" value={`${Number(config?.default_service_point_charge || 250).toLocaleString()} pts`} tone="accent" />
+          <PillStat label="Naira equivalent" value={`₦${Number(config?.default_service_point_charge || 250).toLocaleString('en-NG')}`} />
           <PillStat label="Funding method" value="Manual bank transfer" />
         </div>
+        <Link to="/miniapp/orders" className="mt-4 flex items-center justify-center gap-2 rounded-[20px] bg-[var(--tg-secondary-bg-color)] px-5 py-3 text-sm font-black text-[var(--tg-text-color)] shadow-sm">
+          Service orders
+          <ArrowRight size={16} />
+        </Link>
       </section>
     </div>
   );

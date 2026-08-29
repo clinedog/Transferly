@@ -48,7 +48,7 @@ class ApiConfigValidator {
     if (status.configuredBaseUrl) {
       try {
         new URL(status.configuredBaseUrl);
-      } catch (_error) {
+      } catch {
         issues.push({
           code: ISSUE_CODES.API_BASE_URL_INVALID,
           severity: 'critical',

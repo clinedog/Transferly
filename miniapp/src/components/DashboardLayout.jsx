@@ -69,7 +69,7 @@ export default function DashboardLayout({ children }) {
     try {
       await navigator.clipboard.writeText(referralLink);
       toast.success('Referral link copied');
-    } catch (_error) {
+    } catch {
       toast.error('Unable to copy referral link');
     }
   };

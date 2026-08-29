@@ -152,7 +152,6 @@ export default function AdminFinanceTab() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openDetail = async (request) => {

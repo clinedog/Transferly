@@ -72,7 +72,7 @@ function isConnectionFastEnough() {
     const effective = nav.effectiveType || '';
     // effectiveType values: 'slow-2g', '2g', '3g', '4g'
     return !/^(slow-2g|2g)$/.test(effective);
-  } catch (e) {
+  } catch {
     return true;
   }
 }
@@ -297,7 +297,6 @@ const defaultScreenOptions = [
   { id: 'services', label: 'Services', to: '/miniapp/services', icon: Sparkles },
   { id: 'studio', label: 'Studio', to: '/miniapp/studio', icon: Zap },
   { id: 'paypal', label: 'PayPal', to: '/miniapp/services/paypal', icon: FileText },
-  { id: 'stripe', label: 'Stripe', to: '/miniapp/services/stripe/overview', icon: CreditCard },
   { id: 'analytics', label: 'Metrics', to: '/miniapp/analytics', icon: BarChart3 },
   { id: 'vault', label: 'Vault', to: '/miniapp/vault', icon: History },
   { id: 'orders', label: 'Orders', to: '/miniapp/orders', icon: CreditCard },
@@ -652,7 +651,7 @@ function ProviderDock() {
         {providerHighlights.map((provider) => (
           <Link
             key={provider.slug}
-            to={provider.slug === 'paypal' ? '/miniapp/services/paypal' : getProviderWorkspaceRoute(provider.slug)}
+            to={getMiniAppServiceTarget(provider)}
             onMouseEnter={prefetchProviderWorkspace}
             onFocus={prefetchProviderWorkspace}
             className="rounded-[24px] bg-[var(--tg-secondary-bg-color)] p-4 transition active:scale-[0.99]"
@@ -823,10 +822,9 @@ function HeroPanel({ profile, telegram, receipts, topUpOrders }) {
     try {
       const cleanup = setupPrefetchOnViewport(document);
       return () => cleanup && cleanup();
-    } catch (e) {
+    } catch (error) {
       // non-fatal: do not block render
-      // eslint-disable-next-line no-console
-      console.warn('Viewport prefetch setup failed', e);
+      console.warn('Viewport prefetch setup failed', error);
       return undefined;
     }
   }, []);
@@ -1171,7 +1169,7 @@ function ScriptCatalogTile({ service }) {
 }
 
 function ServicesSection() {
-  const aiReply = getServiceBySlug('ai-reply');
+  const paypal = getServiceBySlug('paypal');
 
   return (
     <div className="space-y-4">
@@ -1179,20 +1177,20 @@ function ServicesSection() {
         <h2 className="text-3xl font-black tracking-[-0.045em] text-[var(--tg-text-color)]">Services</h2>
       </section>
 
-      {aiReply ? (
+      {paypal ? (
         <Link
-          to={getMiniAppServiceTarget(aiReply)}
+          to={getMiniAppServiceTarget(paypal)}
           className="group flex items-center gap-4 rounded-[8px] border border-[var(--miniapp-border-color)] bg-[var(--tg-section-bg-color)] p-4 text-[var(--tg-text-color)] transition active:scale-[0.99]"
         >
-          <ServiceLogo service={aiReply} size="lg" />
+          <ServiceLogo service={paypal} size="lg" />
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-base font-black leading-tight tracking-[-0.03em] sm:text-lg">{aiReply.title}</span>
+              <span className="text-base font-black leading-tight tracking-[-0.03em] sm:text-lg">{paypal.title}</span>
               <span className="rounded-full bg-[var(--tg-button-color)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-[var(--tg-button-text-color)]">
-                New
+                Available Now
               </span>
             </span>
-            <span className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">{aiReply.description}</span>
+            <span className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">PayPal invoices, payouts, transactions, webhooks, and provider status.</span>
           </span>
           <ArrowRight size={18} className="shrink-0 text-[var(--tg-button-color)] transition group-hover:translate-x-0.5" />
         </Link>
@@ -3893,7 +3891,10 @@ function HomeSection({ profile, telegram, receipts, topUpOrders, paymentIssues, 
         loading={loading}
         paymentIssues={paymentIssues}
       />
+      <LaunchPath />
       <FeaturedStrip />
+      <ServiceRail services={miniAppServiceHighlights} />
+      <MarketplaceBoard />
       <AllServicesGrid />
     </div>
   );
@@ -3939,7 +3940,7 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
       await navigator.clipboard.writeText(supportContext);
       notify('success');
       toast.success('Support context copied');
-    } catch (_error) {
+    } catch {
       notify('error');
       toast.error('Unable to copy support context');
     }
@@ -4250,7 +4251,7 @@ function ProfileSection({ telegram, profile, user }) {
       await navigator.clipboard.writeText(referralLink);
       notify('success');
       toast.success('Referral link copied');
-    } catch (_error) {
+    } catch {
       toast.error('Unable to copy referral link');
     }
   }, [notify, referralLink]);
@@ -4651,7 +4652,7 @@ export default function MiniAppPage() {
     ? (lane || routeTail.split('/').filter(Boolean)[0] || '')
     : '';
   const isProviderLaneRoute = Boolean(
-    activeServiceSlug &&
+    activeServiceSlug === 'paypal' &&
     activeProviderLane &&
     isProviderManifestSlug(activeServiceSlug)
   );
@@ -4689,20 +4690,20 @@ export default function MiniAppPage() {
     if (
       activeSection === 'services' &&
       activeServiceSlug &&
-      isProviderManifestSlug(activeServiceSlug) &&
+      activeServiceSlug === 'paypal' &&
       !activeProviderLane
     ) {
       navigate(`${getProviderWorkspaceRoute(activeServiceSlug)}${location.search}`, { replace: true });
       return;
     }
 
-    if (provider && isProviderManifestSlug(provider) && activeSection === 'invoices') {
+    if (provider === 'paypal' && activeSection === 'invoices') {
       const targetLane = getPreferredProviderLane(provider, providerCollectionLanePriority);
       navigate(buildProviderWorkspaceRedirect(location.search, getProviderWorkspaceRoute(provider, targetLane)), { replace: true });
       return;
     }
 
-    if (provider && isProviderManifestSlug(provider) && activeSection === 'payouts') {
+    if (provider === 'paypal' && activeSection === 'payouts') {
       const targetLane = getPreferredProviderLane(provider, providerSendingLanePriority);
       navigate(buildProviderWorkspaceRedirect(location.search, getProviderWorkspaceRoute(provider, targetLane)), { replace: true });
     }

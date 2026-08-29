@@ -419,7 +419,7 @@ function StripeConnectedAccountsPanel({ accent }) {
     try {
       await navigator.clipboard.writeText(accountId);
       setAccountsState((previous) => ({ ...previous, notice: 'Stripe account id copied for payout receiver.' }));
-    } catch (_error) {
+    } catch {
       setAccountsState((previous) => ({ ...previous, notice: accountId }));
     }
   };

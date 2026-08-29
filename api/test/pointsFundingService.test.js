@@ -14,6 +14,7 @@ process.env.PAYPAL_WEBHOOK_ID = 'points-funding-webhook';
 process.env.POINTS_FUNDING_BANK_PROVIDER = 'Test Bank';
 process.env.POINTS_FUNDING_ACCOUNT_NAME = 'TRANSFERLY TEST SERVICES';
 process.env.POINTS_FUNDING_ACCOUNT_NUMBER = '1234567890';
+process.env.GENERATED_ASSET_STORAGE_PATH = path.join(testDir, 'private-assets');
 
 const { close, db } = require('../db');
 const { migrate } = require('../db/migrate');
@@ -23,6 +24,7 @@ const { profileRepository } = require('../repositories/profileRepository');
 const { userRepository } = require('../repositories/userRepository');
 const { pointsFundingService } = require('../services/pointsFundingService');
 const { pointLedgerService } = require('../services/pointLedgerService');
+const { notificationService } = require('../services/notificationService');
 
 let fundingCreateSequence = 0;
 
@@ -51,6 +53,13 @@ function evidence(overrides = {}) {
     sha256: 'a'.repeat(64),
     ...overrides
   };
+}
+
+function pngBase64() {
+  return Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
+  ]).toString('base64');
 }
 
 async function createSubmittedFundingRequest(userId, txReference = 'BANK-TX-001') {
@@ -177,6 +186,25 @@ test('admin approval credits points exactly once and writes audit plus ledger re
   assert.equal(approved.already_processed, false);
   assert.equal(await pointLedgerService.getBalance('funding-user-approve'), 1000);
 
+  const notifications = await db.all(
+    'SELECT type, title FROM notifications WHERE user_id = ? ORDER BY created_at ASC',
+    ['funding-user-approve']
+  );
+  assert.ok(notifications.some((notification) => notification.type === 'funding.created'));
+  assert.ok(notifications.some((notification) => notification.type === 'funding.submitted'));
+  assert.equal(notifications.filter((notification) => notification.type === 'points.credited').length, 1);
+
+  const userNotifications = await notificationService.listUserNotifications('funding-user-approve');
+  const creditNotification = userNotifications.data.find((notification) => notification.type === 'points.credited');
+  assert.ok(creditNotification);
+  const readResult = await notificationService.markUserNotificationRead('funding-user-approve', creditNotification.id);
+  assert.ok(readResult.notification.read_at);
+  await createUser('funding-user-notification-other');
+  await assert.rejects(
+    notificationService.markUserNotificationRead('funding-user-notification-other', creditNotification.id),
+    (error) => error?.statusCode === 404 && error?.code === 'NOTIFICATION_NOT_FOUND'
+  );
+
   const retried = await pointsFundingService.approveFundingRequest({
     requestId: request.id,
     adminActorId: 'finance-admin-2',
@@ -216,6 +244,12 @@ test('concurrent admin approvals cannot double-credit a funding request', async 
   assert.equal(results.filter((result) => result.already_processed).length, 1);
   assert.equal(results.filter((result) => !result.already_processed).length, 1);
   assert.equal(await pointLedgerService.getBalance('funding-user-concurrent'), 1000);
+
+  const creditNotifications = await db.all(
+    "SELECT id FROM notifications WHERE user_id = ? AND type = 'points.credited'",
+    ['funding-user-concurrent']
+  );
+  assert.equal(creditNotifications.length, 1);
 
   const ledgerEntries = await pointTransactionRepository.findByUserId('funding-user-concurrent');
   assert.equal(ledgerEntries.filter((entry) => entry.referenceId === request.id).length, 1);
@@ -264,4 +298,81 @@ test('rejects unsupported evidence files before state transition', async () => {
 
   const row = await db.get('SELECT status FROM points_funding_requests WHERE id = ?', [created.funding_request.id]);
   assert.equal(row.status, 'PAYMENT_INSTRUCTIONS');
+});
+
+test('uploads private funding evidence, enforces owner access, and does not credit points', async () => {
+  await createUser('funding-user-upload');
+  await createUser('funding-user-upload-other');
+  const config = await pointsFundingService.getFundingConfig();
+  const created = await pointsFundingService.createFundingRequest({
+    userId: 'funding-user-upload',
+    packageId: config.packages[0].id,
+    idempotencyKey: 'create-funding-user-upload'
+  });
+
+  const uploaded = await pointsFundingService.uploadAndSubmitEvidence({
+    userId: 'funding-user-upload',
+    requestId: created.funding_request.id,
+    fileName: '../proof.png',
+    mimeType: 'image/png',
+    contentBase64: pngBase64(),
+    userTransactionReference: 'UPLOAD-TX-001',
+    userNote: 'Uploaded from Mini App.'
+  });
+
+  assert.equal(uploaded.funding_request.status, 'PAYMENT_REPORTED');
+  assert.equal(uploaded.funding_request.evidence.metadata.original_name, 'proof.png');
+  assert.equal(uploaded.funding_request.evidence.storage_key, undefined);
+  assert.equal(await pointLedgerService.getBalance('funding-user-upload'), 0);
+
+  const repeated = await pointsFundingService.uploadAndSubmitEvidence({
+    userId: 'funding-user-upload',
+    requestId: created.funding_request.id,
+    fileName: 'proof-again.png',
+    mimeType: 'image/png',
+    contentBase64: pngBase64(),
+    userTransactionReference: 'UPLOAD-TX-001'
+  });
+  assert.equal(repeated.idempotent, true);
+  assert.equal(await pointLedgerService.getBalance('funding-user-upload'), 0);
+
+  const content = await pointsFundingService.getEvidenceContentForUser({
+    userId: 'funding-user-upload',
+    requestId: created.funding_request.id
+  });
+  assert.equal(content.mimeType, 'image/png');
+  assert.ok(Buffer.isBuffer(content.content));
+
+  await assert.rejects(
+    pointsFundingService.getEvidenceContentForUser({
+      userId: 'funding-user-upload-other',
+      requestId: created.funding_request.id
+    }),
+    (error) => error?.statusCode === 404 && error?.code === 'FUNDING_EVIDENCE_NOT_FOUND'
+  );
+});
+
+test('rejects mismatched uploaded evidence content before state transition', async () => {
+  await createUser('funding-user-upload-mismatch');
+  const config = await pointsFundingService.getFundingConfig();
+  const created = await pointsFundingService.createFundingRequest({
+    userId: 'funding-user-upload-mismatch',
+    packageId: config.packages[0].id,
+    idempotencyKey: 'create-funding-user-upload-mismatch'
+  });
+
+  await assert.rejects(
+    pointsFundingService.uploadAndSubmitEvidence({
+      userId: 'funding-user-upload-mismatch',
+      requestId: created.funding_request.id,
+      fileName: 'fake.png',
+      mimeType: 'image/png',
+      contentBase64: Buffer.from('not a png').toString('base64')
+    }),
+    (error) => error?.statusCode === 400 && error?.code === 'PAYMENT_EVIDENCE_CONTENT_MISMATCH'
+  );
+
+  const row = await db.get('SELECT status, evidence_storage_key FROM points_funding_requests WHERE id = ?', [created.funding_request.id]);
+  assert.equal(row.status, 'PAYMENT_INSTRUCTIONS');
+  assert.equal(row.evidence_storage_key, null);
 });

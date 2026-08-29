@@ -4,6 +4,7 @@ const {
   createFundingRequestSchema,
   fundingRequestParamsSchema,
   submitFundingEvidenceSchema,
+  uploadFundingEvidenceSchema,
   topUpOrderParamsSchema,
   updateTopUpOrderStatusSchema,
   updateCurrentUserProfileSchema,
@@ -43,6 +44,33 @@ async function submitCurrentUserFundingEvidenceController(request, response) {
     userNote: body.userNote
   });
   response.json(result);
+}
+
+async function getCurrentUserFundingEvidenceController(request, response) {
+  const params = fundingRequestParamsSchema.parse(request.params || {});
+  const evidence = await pointsFundingService.getEvidenceContentForUser({
+    userId: request.auth.userId,
+    requestId: params.id
+  });
+  response.setHeader('Content-Type', evidence.mimeType);
+  response.setHeader('Content-Disposition', `attachment; filename="${evidence.fileName.replace(/"/g, '')}"`);
+  response.setHeader('Cache-Control', 'private, no-store');
+  response.send(evidence.content);
+}
+
+async function uploadCurrentUserFundingEvidenceController(request, response) {
+  const params = fundingRequestParamsSchema.parse(request.params || {});
+  const body = uploadFundingEvidenceSchema.parse(request.body || {});
+  const result = await pointsFundingService.uploadAndSubmitEvidence({
+    userId: request.auth.userId,
+    requestId: params.id,
+    fileName: body.fileName,
+    mimeType: body.mimeType,
+    contentBase64: body.contentBase64,
+    userTransactionReference: body.userTransactionReference,
+    userNote: body.userNote
+  });
+  response.status(result.idempotent ? 200 : 201).json(result);
 }
 
 async function getUserPointsController(request, response) {
@@ -86,11 +114,13 @@ module.exports = {
   createCurrentUserFundingRequestController,
   createCurrentUserTopUpOrderController,
   deleteCurrentUserAccountController,
+  getCurrentUserFundingEvidenceController,
   getFundingConfigController,
   getUserPointsController,
   listCurrentUserFundingRequestsController,
   listCurrentUserTopUpOrdersController,
   submitCurrentUserFundingEvidenceController,
+  uploadCurrentUserFundingEvidenceController,
   updateCurrentUserTopUpOrderStatusController,
   updateCurrentUserProfileController
 };

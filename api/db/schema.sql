@@ -414,6 +414,21 @@ CREATE TABLE IF NOT EXISTS testimonials (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  data_json TEXT,
+  read_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created_at
+ON notifications (user_id, created_at);
+
 CREATE TABLE IF NOT EXISTS payment_ops_issues (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,

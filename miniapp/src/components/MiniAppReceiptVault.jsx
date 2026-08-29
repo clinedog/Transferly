@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
   Copy,
@@ -425,7 +425,7 @@ export default function MiniAppReceiptVault() {
       toast.success('Receipt duplicated');
       telegram.notify('success');
       setSelectedKey(getReceiptKey(result));
-    } catch (_error) {
+    } catch {
       toast.error('Failed to duplicate receipt');
       telegram.notify('error');
     } finally {
@@ -443,7 +443,7 @@ export default function MiniAppReceiptVault() {
       await navigator.clipboard.writeText(buildShareText(selectedReceipt));
       toast.success('Receipt summary copied');
       telegram.notify('success');
-    } catch (_error) {
+    } catch {
       toast.error('Unable to copy summary');
     }
   };

@@ -54,10 +54,10 @@ const SERVICE_GROUPS = [
 const AVAILABLE_SERVICE_STATUSES = new Set(["active", "sandbox"]);
 
 const SERVICE_CATALOG = [
-  { slug: "transaction-record", title: "Verified Transaction Record", category: "Transaction Records", status: "active", badge: "Verified", executionMode: "authoritative" },
-  { slug: "ai-reply", title: "Support AI Reply", category: "Featured", status: "active", badge: "Live", launchMode: "info" },
-  { slug: "articles", title: "Ops Playbooks", category: "Knowledge Library", status: "active", badge: "Live", launchMode: "info" },
-  { slug: "faker-data", title: "Sandbox Test Data", category: "Sandbox Tools", status: "sandbox", badge: "Sandbox", receiptType: "bank", executionMode: "sandbox", launchMode: "info" },
+  { slug: "transaction-record", title: "Verified Transaction Record", category: "Transaction Records", status: "preview", badge: "Coming Soon", executionMode: "authoritative" },
+  { slug: "ai-reply", title: "Support AI Reply", category: "Featured", status: "preview", badge: "Coming Soon", launchMode: "info" },
+  { slug: "articles", title: "Ops Playbooks", category: "Knowledge Library", status: "preview", badge: "Coming Soon", launchMode: "info" },
+  { slug: "faker-data", title: "Sandbox Test Data", category: "Sandbox Tools", status: "preview", badge: "Coming Soon", executionMode: "sandbox", launchMode: "info" },
   { slug: "opay", title: "Opay", category: "Legacy Wallet Records", status: "disabled", badge: "Disabled" },
   { slug: "kuda", title: "Kuda", category: "Legacy Wallet Records", status: "disabled", badge: "Disabled" },
   { slug: "palmpay", title: "Palmpay", category: "Legacy Wallet Records", status: "disabled", badge: "Disabled" },
@@ -65,25 +65,27 @@ const SERVICE_CATALOG = [
   { slug: "bybit", title: "Bybit", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "coinbase", title: "Coinbase", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "paypal", title: "PayPal", category: "Payment Providers", status: "active", badge: "Live" },
-  { slug: "stripe", title: "Stripe Connect", category: "Payment Providers", status: "active", badge: "Adapter" },
-  { slug: "paystack", title: "Paystack", category: "Payment Providers", status: "active", badge: "Adapter" },
-  { slug: "flutterwave", title: "Flutterwave", category: "Payment Providers", status: "active", badge: "Adapter" },
-  { slug: "crypto", title: "Crypto Commerce", category: "Payment Providers", status: "active", badge: "Adapter" },
+  { slug: "stripe", title: "Stripe Connect", category: "Payment Providers", status: "preview", badge: "Coming Soon" },
+  { slug: "paystack", title: "Paystack", category: "Payment Providers", status: "preview", badge: "Coming Soon" },
+  { slug: "flutterwave", title: "Flutterwave", category: "Payment Providers", status: "preview", badge: "Coming Soon" },
+  { slug: "crypto", title: "Crypto Commerce", category: "Payment Providers", status: "preview", badge: "Coming Soon" },
   { slug: "crypto-com", title: "Crypto.com", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
-  { slug: "wise", title: "Wise", category: "Payment Providers", status: "active", badge: "Live" },
+  { slug: "wise", title: "Wise", category: "Payment Providers", status: "preview", badge: "Coming Soon" },
   { slug: "cash-app", title: "Cash App", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "zelle", title: "Zelle", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "venmo", title: "Venmo", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "trust-wallet", title: "Trust Wallet", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
   { slug: "gcash", title: "GCash", category: "Legacy Notifications", status: "disabled", badge: "Disabled" },
-  { slug: "crypto-receipts", title: "Receipt Vault", category: "Receipt Vault", status: "active", badge: "Live" },
+  { slug: "crypto-receipts", title: "Receipt Vault", category: "Receipt Vault", status: "preview", badge: "Coming Soon" },
   { slug: "support-sites", title: "Support Desk", category: "Support Desk", status: "preview", badge: "Preview", launchMode: "info" },
   { slug: "pass-clone", title: "Security Center", category: "Legacy Security Tools", status: "disabled", badge: "Disabled", launchMode: "info" },
   { slug: "wallet-tracker", title: "Provider Balance Tracker", category: "Provider Balance Tracker", status: "preview", badge: "Preview", launchMode: "info" },
   { slug: "qr-code", title: "Payment QR", category: "Payment QR", status: "preview", badge: "Preview", launchMode: "info" },
   { slug: "link-shortener", title: "Payment Link Shortener", category: "Legacy Payment Links", status: "disabled", badge: "Disabled", launchMode: "info" },
   { slug: "investinnova", title: "Workflow Templates", category: "Template Marketplace", status: "preview", badge: "Preview", launchMode: "info" },
-];
+].map((service) => service.slug === "paypal"
+  ? service
+  : { ...service, status: "preview", badge: "Coming Soon", receiptType: undefined });
 
 const PAYMENT_PROVIDER_SLUGS = new Set(["paypal", "stripe", "wise", "paystack", "flutterwave", "crypto"]);
 

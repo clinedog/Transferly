@@ -17,6 +17,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const config = require('../../config');
 const { requireAuthenticatedUser } = require('../../middleware/authenticateRequest');
 const { providerModuleRegistry } = require('../moduleRegistry');
 
@@ -29,6 +30,7 @@ const { providerModuleRegistry } = require('../moduleRegistry');
 const WEBHOOK_HANDLED_BY_CORE = new Set(['paypal', 'stripe', 'crypto']);
 
 const PROVIDERS_DIR = path.resolve(__dirname, '..');
+const ACTIVE_PRODUCTION_PROVIDERS = new Set(['paypal']);
 
 /**
  * @returns {{ providerRouters: Array<{prefix: string, router: import('express').Router}>,
@@ -40,6 +42,9 @@ function buildPerProviderRouters({ apiPrefixes = ['/api'] } = {}) {
 
   for (const mod of providerModuleRegistry.list({ includeDisabled: false })) {
     const key = mod.key;
+    if (config.PAYPAL_ONLY_PRODUCTION_MVP && !ACTIVE_PRODUCTION_PROVIDERS.has(key)) {
+      continue;
+    }
 
     const routesPath = path.join(PROVIDERS_DIR, key, 'routes.js');
     if (fs.existsSync(routesPath)) {

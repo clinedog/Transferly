@@ -48,7 +48,7 @@ jobs:
         run: npm run build --prefix miniapp
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npm --prefix miniapp exec playwright install --with-deps chromium
 
       - name: Serve built miniapp for Lighthouse
         run: npx http-server miniapp/dist -p 5000 &

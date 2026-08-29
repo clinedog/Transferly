@@ -24,7 +24,9 @@ export default function AdminSettingsTab() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { id, created_at, ...updates } = form;
+    const updates = { ...form };
+    delete updates.id;
+    delete updates.created_at;
     const result = await updateConfig(updates);
     setSaving(false);
     if (result.success) toast.success('Settings saved!');

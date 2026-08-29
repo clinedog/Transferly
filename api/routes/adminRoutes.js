@@ -24,6 +24,7 @@ const {
   deleteAdminInvoiceTemplateController,
   deleteAdminTestimonialController,
   getAdminFinanceOverviewController,
+  getAdminFundingEvidenceController,
   getAdminFundingRequestController,
   getAdminUserFinanceProfileController,
   getAdminUserRiskProfileController,
@@ -128,6 +129,7 @@ router.get('/top-up-orders', requireAdminActor, asyncHandler(listTopUpOrdersCont
 router.post('/top-up-orders/:id/complete', requireAdminActor, asyncHandler(completeTopUpOrderController));
 router.post('/top-up-orders/:id/cancel', requireAdminActor, asyncHandler(cancelTopUpOrderController));
 router.get('/points-funding', requireAdminActor, asyncHandler(listAdminFundingRequestsController));
+router.get('/points-funding/:id/evidence', requireAdminActor, asyncHandler(getAdminFundingEvidenceController));
 router.get('/points-funding/:id', requireAdminActor, asyncHandler(getAdminFundingRequestController));
 router.post('/points-funding/:id/assign', requireAdminActor, asyncHandler(assignAdminFundingRequestController));
 router.post('/points-funding/:id/under-review', requireAdminActor, asyncHandler(markAdminFundingRequestUnderReviewController));

@@ -414,7 +414,7 @@ export default function GenerateReceiptPage() {
 
       toast.success('Receipt generated and saved');
       await downloadReceipt('png');
-    } catch (_error) {
+    } catch {
       toast.error('Failed to generate receipt');
     } finally {
       setGenerating(false);
@@ -474,7 +474,7 @@ export default function GenerateReceiptPage() {
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(`transferly_receipt_${Date.now()}.pdf`);
       toast.success('Downloaded as PDF');
-    } catch (_error) {
+    } catch {
       toast.error('Failed to download receipt');
     }
   };
@@ -533,7 +533,7 @@ export default function GenerateReceiptPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {Object.entries(tabMeta).map(([key, meta]) => {
+          {Object.keys(tabMeta).map((key) => {
             const active = activeTab === key;
             return (
               <button

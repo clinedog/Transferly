@@ -132,6 +132,9 @@ function collectProductionConfigErrors(parsed, derived) {
   if (Number(parsed.DEFAULT_SERVICE_POINT_CHARGE) !== 250) {
     errors.push('DEFAULT_SERVICE_POINT_CHARGE must be 250 unless code/tests are updated for a new pricing policy.');
   }
+  if (parsed.PAYPAL_ONLY_PRODUCTION_MVP === false) {
+    errors.push('PAYPAL_ONLY_PRODUCTION_MVP must be true for the current production release.');
+  }
   if (/^(0+|1234567890)$/i.test(String(parsed.POINTS_FUNDING_ACCOUNT_NUMBER || '').trim())) {
     errors.push('POINTS_FUNDING_ACCOUNT_NUMBER must be a real configured production account number.');
   }

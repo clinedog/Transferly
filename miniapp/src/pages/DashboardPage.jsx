@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, CheckCircle2, Coins, Copy, FileClock, FileText, LifeBuoy, Sparkles, Users, Wallet, X } from 'lucide-react';
+import { ArrowRight, Bot, CheckCircle2, Coins, FileClock, FileText, LifeBuoy, Sparkles, Users, Wallet, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import ServiceLogo from '../components/ServiceLogo';
 import { dashboardPreviewSlugs, getServiceBySlug } from '../lib/servicesCatalog';
-import { GlassCard, BalanceCard, StatGrid, AnimatedCounter, PremiumButton } from '../components/ui';
+import { GlassCard, BalanceCard, StatGrid, PremiumButton } from '../components/ui';
 
 const featuredTools = [
   {
@@ -37,12 +37,6 @@ const featuredTools = [
     icon: FileText,
     to: '/services/opay'
   }
-];
-
-const primaryLinks = [
-  { label: 'Services', to: '/services' },
-  { label: 'Orders', to: '/orders' },
-  { label: 'History', to: '/transactions' }
 ];
 
 const TELEGRAM_MODAL_KEY = 'transferly_telegram_community_seen';
@@ -185,7 +179,7 @@ export default function DashboardPage() {
     try {
       await navigator.clipboard.writeText(referralLink);
       toast.success('Referral link copied');
-    } catch (_error) {
+    } catch {
       toast.error('Unable to copy referral link');
     }
   };
@@ -245,14 +239,6 @@ export default function DashboardPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_360px]">
-          <div className="rounded-[30px] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                {/* Stats moved above - can remove this section or repurpose */}
-              </div>
-            </div>
-          </div>
-
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                 <div className="rounded-[24px] bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white hover:shadow-lg-glass transition-all duration-300">
                   <div className="flex items-center justify-between mb-4">
@@ -310,8 +296,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
           <div className="rounded-[30px] bg-[#121212] p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">

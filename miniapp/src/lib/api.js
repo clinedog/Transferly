@@ -63,7 +63,7 @@ async function parseJsonSafely(response) {
 
   try {
     return JSON.parse(text);
-  } catch (_error) {
+  } catch {
     return null;
   }
 }
@@ -553,6 +553,17 @@ export function listPointsFundingRequests() {
   return apiRequest('/api/user/me/points/funding/requests');
 }
 
+export function listNotifications(params = {}) {
+  return apiRequest(`/api/user/me/notifications${buildQuery(params)}`);
+}
+
+export function markNotificationRead(notificationId) {
+  return apiRequest(`/api/user/me/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: 'POST',
+    body: {}
+  });
+}
+
 export function createPointsFundingRequest(payload) {
   return apiRequest('/api/user/me/points/funding/requests', {
     method: 'POST',
@@ -568,6 +579,16 @@ export function submitPointsFundingEvidence(requestId, payload) {
     method: 'POST',
     headers: {
       'Idempotency-Key': createIdempotencyKey('miniapp:points-funding:evidence')
+    },
+    body: payload
+  });
+}
+
+export function uploadPointsFundingEvidence(requestId, payload) {
+  return apiRequest(`/api/user/me/points/funding/requests/${encodeURIComponent(requestId)}/evidence/upload`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': createIdempotencyKey('miniapp:points-funding:evidence-upload')
     },
     body: payload
   });

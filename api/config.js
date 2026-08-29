@@ -127,7 +127,8 @@ const envSchema = z.object({
   TRANSFERLY_OWNER_TELEGRAM_USER_IDS: z.string().default(''),
   TRANSFERLY_ADMIN_TELEGRAM_USER_IDS: z.string().default(''),
   SERVICE_FEATURE_FLAGS: z.string().default(''),
-  PAYMENT_PROVIDER_FEATURE_FLAGS: z.string().default('')
+  PAYMENT_PROVIDER_FEATURE_FLAGS: z.string().default(''),
+  PAYPAL_ONLY_PRODUCTION_MVP: z.enum(['true', 'false']).transform((value) => value === 'true').default('true')
 });
 
 const parsed = envSchema.parse(process.env);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, FileText, Gauge, RefreshCw, Send, Settings, Shield, WalletCards, Zap } from 'lucide-react';
+import { Activity, FileText, RefreshCw, Send, Settings, Shield, WalletCards, Zap } from 'lucide-react';
 import { ProviderOverview } from '../shared/BaseProviderUI';
 
 /**

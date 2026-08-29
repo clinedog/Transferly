@@ -25,6 +25,13 @@ const { paypalWorkspaceService } = require('../services/paypalWorkspaceService')
 const { PROVIDER_CONTRACT_VERSION } = require('../constants/providerWorkspaceContract');
 const { AUDIT_ACTOR_TYPE } = require('../utils/constants');
 const { logger } = require('../utils/logger');
+const config = require('../config');
+
+function filterReleaseProviders(providers) {
+  return config.PAYPAL_ONLY_PRODUCTION_MVP
+    ? providers.filter((provider) => (provider.slug || provider.provider || provider.key) === 'paypal')
+    : providers;
+}
 
 function resolveAuditActorType(request) {
   return request.auth && request.auth.role === 'ADMIN' ? AUDIT_ACTOR_TYPE.ADMIN : AUDIT_ACTOR_TYPE.USER;
@@ -103,14 +110,14 @@ function buildMutationMeta(request, provider) {
 
 async function listProvidersController(request, response) {
   response.json({
-    data: providerCapabilityService.listProviderCapabilities(),
+    data: filterReleaseProviders(providerCapabilityService.listProviderCapabilities()),
     ...buildProviderContractMeta(request)
   });
 }
 
 async function listProviderReadinessController(request, response) {
   response.json({
-    data: providerReadinessService.listProviderReadiness(),
+    data: filterReleaseProviders(providerReadinessService.listProviderReadiness()),
     ...buildProviderContractMeta(request)
   });
 }

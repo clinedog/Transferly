@@ -70,9 +70,18 @@ const SERVICE_CATALOGUE_SEED = Object.freeze([
   { slug: 'investinnova', title: 'Workflow Templates', category: 'Template Marketplace', badge: 'Preview', status: 'preview' }
 ]);
 
+const PRODUCTION_SERVICE_CATALOGUE = Object.freeze(
+  SERVICE_CATALOGUE_SEED.map((service) => Object.freeze(
+    service.slug === 'paypal'
+      ? service
+      : { ...service, status: 'preview', badge: 'Coming Soon', permissions: [] }
+  ))
+);
+
 module.exports = {
   AVAILABLE_SERVICE_STATUSES,
   PAYMENT_PROVIDER_SLUGS,
+  PRODUCTION_SERVICE_CATALOGUE,
   SANDBOX_REQUIRED_MARKINGS,
   SERVICE_STATUS_VALUES,
   SERVICE_CATALOGUE_SEED

@@ -70,6 +70,7 @@ function removeSqliteArtifacts(filePath) {
 removeSqliteArtifacts(sqlitePath);
 
 const { createApp } = require('../app');
+const config = require('../config');
 const { dispatchOrderProcessing, dispatchPendingOrders } = require('../jobs/dispatchers');
 const { bootstrapService } = require('../services/bootstrapService');
 const { close, db, initializeDatabase, loadSchemaSql } = require('../db');
@@ -98,6 +99,7 @@ const { catalogueService } = require('../services/catalogueService');
 const { opsService } = require('../services/opsService');
 const { orderService } = require('../services/orderService');
 const { pointLedgerService } = require('../services/pointLedgerService');
+const { pointsFundingService } = require('../services/pointsFundingService');
 const { SANDBOX_REQUIRED_MARKINGS } = require('../constants/serviceCatalogue');
 const { setPointBalance } = require('./helpers/pointLedgerFixtures');
 
@@ -906,6 +908,7 @@ function assertReceiptArtifactsInclude(result, expectedText) {
 async function resetDatabase() {
   await db.exec(`
     DELETE FROM auth_sessions;
+    DELETE FROM notifications;
     DELETE FROM telegram_command_logs;
     DELETE FROM telegram_accounts;
     DELETE FROM risk_flags;
@@ -918,6 +921,7 @@ async function resetDatabase() {
     DELETE FROM order_events;
     DELETE FROM orders;
     DELETE FROM point_reservations;
+    DELETE FROM points_funding_requests;
     DELETE FROM points_transactions;
     DELETE FROM receipts;
     DELETE FROM provider_operation_inbox;
@@ -934,6 +938,33 @@ async function resetDatabase() {
     DELETE FROM wallets;
     DELETE FROM users;
   `);
+}
+
+async function ensurePointsFundingFixtures() {
+  const now = new Date().toISOString();
+  await db.run(
+    `INSERT OR IGNORE INTO points_funding_packages (
+      id, name, points, price_minor, currency, min_amount_minor, max_amount_minor,
+      bonus_points, active, sort_order, metadata_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'NGN', ?, ?, 0, 1, 1, '{}', ?, ?)`,
+    ['points_pkg_api_test_1000', '1,000 Points', 1000, 100000, 100000, 100000, now, now]
+  );
+  await db.run(
+    `INSERT OR IGNORE INTO payment_destinations (
+      id, provider, account_name, account_number, currency, instructions,
+      active, is_primary, metadata_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'NGN', ?, 1, 1, ?, ?, ?)`,
+    [
+      'manual_ngn_destination_default',
+      'Test Bank',
+      'TRANSFERLY TEST SERVICES',
+      '1234567890',
+      'Transfer exactly the amount shown. 1 Transferly Point equals ₦1.',
+      JSON.stringify({ payment_note: 'Include your Transferly payment reference in the bank transfer narration.' }),
+      now,
+      now
+    ]
+  );
 }
 
 before(async () => {
@@ -2470,6 +2501,132 @@ describe('API integration flows', () => {
 
     assert.equal(snapshotResponse.status, 200);
     assert.equal(snapshotResponse.json().topUpOrders[0].status, 'completed');
+  });
+
+  test('points funding evidence upload is private, owner-scoped, and does not credit points', async () => {
+    await ensurePointsFundingFixtures();
+    const balanceBefore = await pointLedgerService.getBalance('demo-user');
+    const fundingConfig = await pointsFundingService.getFundingConfig();
+    const createPayload = JSON.stringify({ packageId: fundingConfig.packages[0].id });
+    const createResponse = await injectRequest(app, {
+      method: 'POST',
+      url: '/api/user/me/points/funding/requests',
+      headers: jsonHeaders(createPayload, bearerHeaders(userTokens.demoUser, {
+        'idempotency-key': 'api-funding-evidence-upload-create'
+      })),
+      body: createPayload
+    });
+
+    assert.equal(createResponse.status, 201);
+    const funding = createResponse.json().funding_request;
+    const pngBase64 = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
+    ]).toString('base64');
+    const uploadPayload = JSON.stringify({
+      fileName: '../bank-proof.png',
+      mimeType: 'image/png',
+      contentBase64: pngBase64,
+      userTransactionReference: 'API-UPLOAD-TX-001',
+      userNote: 'Uploaded through Mini App.'
+    });
+
+    const uploadResponse = await injectRequest(app, {
+      method: 'POST',
+      url: `/api/user/me/points/funding/requests/${funding.id}/evidence/upload`,
+      headers: jsonHeaders(uploadPayload, bearerHeaders(userTokens.demoUser, {
+        'idempotency-key': 'api-funding-evidence-upload-submit'
+      })),
+      body: uploadPayload
+    });
+
+    assert.equal(uploadResponse.status, 201);
+    assert.equal(uploadResponse.json().funding_request.status, 'PAYMENT_REPORTED');
+    assert.equal(uploadResponse.json().funding_request.evidence.storage_key, undefined);
+    assert.equal(await pointLedgerService.getBalance('demo-user'), balanceBefore);
+
+    const ownerDownload = await injectRequest(app, {
+      method: 'GET',
+      url: `/api/user/me/points/funding/requests/${funding.id}/evidence`,
+      headers: bearerHeaders(userTokens.demoUser)
+    });
+    assert.equal(ownerDownload.status, 200);
+    assert.equal(ownerDownload.headers['content-type'], 'image/png');
+    assert.equal(ownerDownload.headers['cache-control'], 'private, no-store');
+
+    const otherDownload = await injectRequest(app, {
+      method: 'GET',
+      url: `/api/user/me/points/funding/requests/${funding.id}/evidence`,
+      headers: bearerHeaders(userTokens.secondaryUser)
+    });
+    assert.equal(otherDownload.status, 404);
+
+    const adminDownload = await injectRequest(app, {
+      method: 'GET',
+      url: `/api/admin/points-funding/${funding.id}/evidence`,
+      headers: bearerHeaders(adminToken)
+    });
+    assert.equal(adminDownload.status, 200);
+    assert.equal(adminDownload.headers['content-type'], 'image/png');
+  });
+
+  test('PayPal-only production scope blocks non-PayPal provider routes', async () => {
+    const originalScope = config.PAYPAL_ONLY_PRODUCTION_MVP;
+    config.PAYPAL_ONLY_PRODUCTION_MVP = true;
+    try {
+      const providersResponse = await injectRequest(app, {
+        method: 'GET',
+        url: '/api/providers',
+        headers: bearerHeaders(userTokens.demoUser)
+      });
+      assert.equal(providersResponse.status, 200);
+      assert.deepEqual(providersResponse.json().data.map((provider) => provider.slug || provider.provider), ['paypal']);
+
+      const stripeResponse = await injectRequest(app, {
+        method: 'GET',
+        url: '/api/providers/stripe/status',
+        headers: bearerHeaders(userTokens.demoUser)
+      });
+      assert.equal(stripeResponse.status, 404);
+      assert.equal(stripeResponse.json().code, 'PROVIDER_COMING_SOON');
+
+      const invoicePayload = JSON.stringify({
+        userId: 'demo-user',
+        provider: 'stripe',
+        recipientEmail: 'buyer@example.com',
+        currency: 'USD',
+        items: [{ name: 'Blocked service', quantity: 1, unitAmount: 10 }]
+      });
+      const invoiceResponse = await injectRequest(app, {
+        method: 'POST',
+        url: '/api/invoices',
+        headers: jsonHeaders(invoicePayload, bearerHeaders(userTokens.demoUser)),
+        body: invoicePayload
+      });
+      assert.equal(invoiceResponse.status, 404);
+      assert.equal(invoiceResponse.json().code, 'PROVIDER_COMING_SOON');
+
+      const payoutPayload = JSON.stringify({
+        userId: 'demo-user',
+        provider: 'stripe',
+        receiver: 'acct_blocked',
+        recipientType: 'STRIPE_ACCOUNT',
+        amount: 10,
+        currency: 'USD'
+      });
+      const payoutResponse = await injectRequest(app, {
+        method: 'POST',
+        url: '/api/payouts',
+        headers: jsonHeaders(payoutPayload, bearerHeaders(userTokens.demoUser, {
+          'idempotency-key': 'blocked-stripe-payout'
+        })),
+        body: payoutPayload
+      });
+      assert.equal(payoutResponse.status, 404);
+      assert.equal(payoutResponse.json().code, 'PROVIDER_COMING_SOON');
+    } finally {
+      config.PAYPAL_ONLY_PRODUCTION_MVP = originalScope;
+    }
   });
 
   test('PATCH /api/user/me/profile updates the authenticated user profile', async () => {

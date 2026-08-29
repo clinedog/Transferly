@@ -15,6 +15,14 @@ const { paypalPayoutService } = require('../services/paypalPayoutService');
 const { paymentTimelineService } = require('../services/paymentTimelineService');
 const { providerPayoutService } = require('../services/providerPayoutService');
 const { AUDIT_ACTOR_TYPE } = require('../utils/constants');
+const { AppError } = require('../utils/errors');
+const config = require('../config');
+
+function assertReleaseProvider(provider) {
+  if (config.PAYPAL_ONLY_PRODUCTION_MVP && provider !== 'paypal') {
+    throw new AppError(404, 'PROVIDER_COMING_SOON', 'This provider is coming soon and is not enabled for the current release.');
+  }
+}
 
 async function loadAccessiblePayout(request, response, payoutId) {
   const payout = await payoutRepository.findByIdentifier(payoutId);
@@ -40,6 +48,7 @@ function resolveAuditActorId(request) {
 
 async function createPayoutController(request, response) {
   const body = createPayoutSchema.parse(request.body);
+  assertReleaseProvider(body.provider);
   const userId = resolveUserIdForRequest(request, body.userId);
 
   if (body.provider !== 'paypal') {
@@ -95,6 +104,7 @@ async function createPayoutController(request, response) {
 
 async function previewPayoutController(request, response) {
   const body = createPayoutSchema.parse(request.body);
+  assertReleaseProvider(body.provider);
   const userId = resolveUserIdForRequest(request, body.userId);
 
   if (body.provider !== 'paypal') {

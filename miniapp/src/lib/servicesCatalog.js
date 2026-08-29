@@ -425,14 +425,14 @@ function normalizeCatalogueItem(policy) {
     ...defaults,
     ...policy,
     description: unavailable
-      ? `${policy.title} is not available in the current Transferly catalogue.`
+      ? `We're preparing ${policy.title} for Transferly.`
       : defaults.description || existing.description || '',
     detail: unavailable
-      ? 'This entry is retained for compatibility and cannot launch or generate output.'
+      ? 'Coming Soon. This service cannot call provider APIs, create orders, or charge points in the current release.'
       : defaults.detail || existing.detail || '',
     launchTo: unavailable ? '' : defaults.launchTo || existing.launchTo || '',
     launchLabel: unavailable
-      ? policy.status === 'preview' ? 'Preview unavailable' : 'Unavailable'
+      ? policy.status === 'preview' ? 'Coming Soon' : 'Unavailable'
       : defaults.launchLabel || existing.launchLabel || 'Open Service'
   };
 }
@@ -469,7 +469,7 @@ export function getServiceBySlug(slug) {
 export function getServicesByGroup(group) {
   return group.slugs
     .map((slug) => getServiceBySlug(slug))
-    .filter((service) => service && isServiceAvailable(service));
+    .filter(Boolean);
 }
 
 const categoryPreviewDefaults = {
@@ -532,7 +532,7 @@ export function getServicePreview(service) {
 }
 
 export function getServiceEstimatedCost(service, config) {
-  if (service.slug === 'faker-data') {
+  if (service.slug === 'paypal') {
     return Number(config?.default_service_point_charge || 250);
   }
 

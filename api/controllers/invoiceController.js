@@ -11,6 +11,14 @@ const { providerInvoiceService } = require('../services/providerInvoiceService')
 const { paymentTimelineService } = require('../services/paymentTimelineService');
 const { paymentTimelineQuerySchema } = require('../schemas/payoutSchemas');
 const { AUDIT_ACTOR_TYPE } = require('../utils/constants');
+const { AppError } = require('../utils/errors');
+const config = require('../config');
+
+function assertReleaseProvider(provider) {
+  if (config.PAYPAL_ONLY_PRODUCTION_MVP && provider !== 'paypal') {
+    throw new AppError(404, 'PROVIDER_COMING_SOON', 'This provider is coming soon and is not enabled for the current release.');
+  }
+}
 
 async function loadAccessibleInvoice(request, response, invoiceId) {
   const invoice = await invoiceRepository.findByIdentifier(invoiceId);
@@ -36,6 +44,7 @@ function resolveAuditActorId(request) {
 
 async function createInvoiceController(request, response) {
   const body = createInvoiceSchema.parse(request.body);
+  assertReleaseProvider(body.provider);
   const result = await dispatchInvoiceCreation({
     ...body,
     userId: resolveUserIdForRequest(request, body.userId),
@@ -46,6 +55,7 @@ async function createInvoiceController(request, response) {
 
 async function previewInvoiceController(request, response) {
   const body = createInvoiceSchema.parse(request.body);
+  assertReleaseProvider(body.provider);
   const preview = await providerInvoiceService.previewInvoice({
     ...body,
     userId: resolveUserIdForRequest(request, body.userId)

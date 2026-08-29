@@ -150,7 +150,7 @@ export default function HistoryPage() {
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(`receipt_${Date.now()}.pdf`);
       toast.success('Downloaded as PDF');
-    } catch (_error) {
+    } catch {
       toast.error('Failed to download');
     }
   };

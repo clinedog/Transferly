@@ -148,7 +148,7 @@ function readSavedViewsFromStorage() {
       invoice: Array.isArray(parsed.invoice) ? parsed.invoice : [],
       payout: Array.isArray(parsed.payout) ? parsed.payout : []
     };
-  } catch (_error) {
+  } catch {
     return { invoice: [], payout: [] };
   }
 }

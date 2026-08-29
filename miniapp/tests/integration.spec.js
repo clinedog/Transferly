@@ -28,6 +28,48 @@ const profile = {
   }
 };
 
+const fundingPackage = {
+  id: 'starter-5000',
+  name: 'Starter 5,000',
+  points: 5000,
+  price_minor: 500000,
+  currency: 'NGN',
+  active: true,
+  display_price: '₦5,000',
+  points_value_note: '1 Transferly Point = ₦1'
+};
+
+const fundingDestination = {
+  id: 'bank-primary',
+  provider: 'Transferly Test Bank',
+  account_name: 'TRANSFERLY CONFIGURED TEST',
+  account_number: '1234567890',
+  account_number_masked: '******7890',
+  currency: 'NGN',
+  instructions: 'Transfer exactly the amount shown and include your funding reference.',
+  payment_note: 'Include your Transferly payment reference in the bank transfer narration.',
+  points_value_note: '1 Transferly Point = ₦1',
+  active: true,
+  is_primary: true
+};
+
+const fundingRequest = {
+  id: 'funding-request-1001',
+  public_reference: 'TP-20260829-ABC123',
+  requested_points: 5000,
+  expected_amount_minor: 500000,
+  currency: 'NGN',
+  payment_method: 'MANUAL_BANK_TRANSFER',
+  payment_reference: 'TP-20260829-ABC123',
+  destination_snapshot: fundingDestination,
+  status: 'PAYMENT_INSTRUCTIONS',
+  risk_status: 'NORMAL',
+  possible_duplicate: false,
+  display_amount: '₦5,000',
+  created_at: '2026-08-29T02:30:00.000Z',
+  updated_at: '2026-08-29T02:30:00.000Z'
+};
+
 function telegramScript({ initData, startParam = 'dashboard' }) {
   return `
     window.Telegram = {
@@ -67,6 +109,7 @@ async function installTelegramRuntime(page, options = {}) {
 async function mockMiniAppApi(page, options = {}) {
   const requests = [];
   let telegramLoginAttempts = 0;
+  let currentFundingRequest = { ...fundingRequest };
   const failTelegramLoginAttempts = Number(options.failTelegramLoginAttempts || 0);
 
   await page.route(/\/api(\/|$)/, async (route) => {
@@ -158,6 +201,52 @@ async function mockMiniAppApi(page, options = {}) {
       return;
     }
 
+    if (path === '/api/user/me/points/funding/config') {
+      await json({
+        packages: [fundingPackage],
+        payment_destination: fundingDestination,
+        evidence_policy: {
+          allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+          max_bytes: 8388608
+        },
+        economy: {
+          points_to_naira_rate: 1,
+          value_note: '1 Transferly Point = ₦1'
+        }
+      });
+      return;
+    }
+
+    if (path === '/api/user/me/points/funding/requests') {
+      await json({ data: [currentFundingRequest] });
+      return;
+    }
+
+    if (path === '/api/user/me/notifications') {
+      await json({ data: [] });
+      return;
+    }
+
+    if (path === `/api/user/me/points/funding/requests/${fundingRequest.id}/evidence/upload` && method === 'POST') {
+      currentFundingRequest = {
+        ...currentFundingRequest,
+        status: 'PAYMENT_REPORTED',
+        submitted_at: '2026-08-29T02:35:00.000Z',
+        evidence: {
+          file_id: 'uploaded-evidence-hash',
+          download_url: `/api/user/me/points/funding/requests/${fundingRequest.id}/evidence`,
+          metadata: {
+            original_name: request.postDataJSON()?.fileName || 'payment-proof.png',
+            mime_type: request.postDataJSON()?.mimeType || 'image/png',
+            size_bytes: 16,
+            sha256: 'b'.repeat(64)
+          }
+        }
+      };
+      await json({ funding_request: currentFundingRequest });
+      return;
+    }
+
     await json({ data: [] });
   });
 
@@ -204,6 +293,48 @@ test('telegram auth recovery retries temporary failures and deduplicates recover
   await expect.poll(() => api.requests.filter((entry) => entry.path === '/api/auth/telegram-mini-app').length).toBeGreaterThan(1);
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_api_token'))).toBe('tg-session-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
+});
+
+test('mini app wallet shows backend-backed funding status center and safe evidence copy', async ({ page }) => {
+  await installTelegramRuntime(page, { startParam: 'wallet' });
+  const api = await mockMiniAppApi(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/miniapp/wallet#tgWebAppStartParam=wallet');
+
+  await expect.poll(() => api.requests.some((entry) => entry.path === '/api/user/me/points/funding/config')).toBe(true);
+  await expect.poll(() => api.requests.some((entry) => entry.path === '/api/user/me/points/funding/requests')).toBe(true);
+
+  await expect(page.getByRole('heading', { name: 'Track verification' })).toBeVisible();
+  await expect(page.getByText('Screenshot submission alone never changes your balance.')).toBeVisible();
+  await expect(page.getByText('Evidence policy')).toBeVisible();
+  await expect(page.getByText('JPEG, PNG, WEBP, PDF up to 8MB')).toBeVisible();
+  await expect(page.getByText('TP-20260829-ABC123')).toBeVisible();
+  await expect(page.getByText('₦5,000').first()).toBeVisible();
+  await expect(page.getByText('Payment instructions')).toBeVisible();
+  await expect(page.getByText('Request created')).toBeVisible();
+  await expect(page.getByRole('button', { name: /copy reference/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /support handoff/i })).toHaveAttribute('href', '/miniapp/support');
+  await expect(page.getByRole('button', { name: /upload evidence/i })).toBeDisabled();
+
+  const bottomNavigation = page.getByTestId('miniapp-bottom-navigation');
+  await expect(bottomNavigation.getByRole('link', { name: /home/i })).toHaveAttribute('href', '/miniapp');
+  await expect(bottomNavigation.getByRole('link', { name: /services/i })).toHaveAttribute('href', '/miniapp/services');
+  await expect(bottomNavigation.getByRole('link', { name: /orders/i })).toHaveAttribute('href', '/miniapp/orders');
+  await expect(bottomNavigation.getByRole('link', { name: /wallet/i })).toHaveAttribute('href', '/miniapp/wallet');
+  await expect(bottomNavigation.getByRole('link', { name: /account/i })).toHaveAttribute('href', '/miniapp/profile');
+});
+
+test('non-PayPal providers remain informational Coming Soon entries', async ({ page }) => {
+  await installTelegramRuntime(page, { startParam: 'services' });
+  const api = await mockMiniAppApi(page);
+
+  await page.goto('/miniapp/services/stripe/overview#tgWebAppStartParam=services');
+
+  await expect(page.getByText('Coming Soon').first()).toBeVisible();
+  await expect(page.getByText(/cannot call provider APIs, create orders, or charge points/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Coming Soon' })).toBeDisabled();
+  await expect.poll(() => api.requests.some((entry) => entry.path.startsWith('/api/providers/stripe'))).toBe(false);
 });
 
 for (const { path, name } of routes) {

@@ -200,7 +200,7 @@ export default function MiniAppReceiptStudio() {
       setGeneratedReceipt(result);
       notify('success');
       toast.success('Sandbox test data generated');
-    } catch (_error) {
+    } catch {
       notify('error');
       toast.error('Failed to generate sandbox test data');
     } finally {

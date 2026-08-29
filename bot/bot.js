@@ -37,6 +37,7 @@ const {
   CONTROL_LABELS,
   applyControlRows,
   buildPrimaryControlRows,
+  buildStartControlRows,
 } = require("./menus/controlMenus");
 const {
   ROLES,
@@ -244,6 +245,8 @@ const MINI_APP_SECTIONS = Object.freeze({
   risk: "risk",
   security: "security",
   wallet: "wallet",
+  services: "services",
+  orders: "orders",
   support: "support",
   profile: "profile",
   ops: "ops",
@@ -632,7 +635,14 @@ function buildMiniAppUrl(section = "home") {
   }
 
   try {
-    return normalizeMiniAppLaunchUrl(config.miniAppUrl);
+    const baseUrl = normalizeMiniAppLaunchUrl(config.miniAppUrl);
+    const { mappedSection } = normalizeMiniAppSection(section);
+    if (!mappedSection) return baseUrl;
+    const url = new URL(baseUrl);
+    url.pathname = `/miniapp/${mappedSection}`.replace(/\/{2,}/g, "/");
+    url.search = "";
+    url.hash = "";
+    return url.toString();
   } catch (error) {
     logger.warn("Mini App launcher URL could not be built", {
       section: String(section || "home").slice(0, 80),
@@ -715,7 +725,14 @@ function buildGuestKeyboard(ctx, access = {}) {
 }
 
 function buildStartKeyboard(ctx, access = {}) {
-  return buildGatewayKeyboard(ctx, access);
+  const keyboard = new InlineKeyboard();
+  applyControlRows(keyboard, buildStartControlRows(), {
+    buildCallbackData,
+    buildMiniAppButton,
+    ctx,
+  });
+  if (!access.isAuthorized) addContactAdminButton(keyboard, access);
+  return keyboard;
 }
 
 function buildMainMenuKeyboard(ctx, access = {}) {

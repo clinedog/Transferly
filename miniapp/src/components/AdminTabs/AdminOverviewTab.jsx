@@ -16,7 +16,7 @@ export default function AdminOverviewTab() {
 
   const stats = [
     { icon: Users, label: 'Total Users', value: allUsers.length, color: brand },
-    { icon: FileText, label: 'DB Receipts', value: config?.total_receipts || 0, color: '#3b82f6' },
+    { icon: FileText, label: 'DB Receipts', value: config?.total_receipts || totalReceipts, color: '#3b82f6' },
     { icon: TrendingUp, label: 'Platform Uptime', value: config?.uptime || '99.9%', color: '#10b981' },
     { icon: Activity, label: 'Total Points Held', value: totalPoints.toLocaleString(), color: '#f59e0b' },
   ];

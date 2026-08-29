@@ -59,6 +59,8 @@ import {
   loginWithTelegramMiniApp as loginWithTelegramMiniAppRequest,
   listPayouts as listPayoutsRequest,
   listPointsFundingRequests as listPointsFundingRequestsRequest,
+  listNotifications as listNotificationsRequest,
+  markNotificationRead as markNotificationReadRequest,
   previewInvoice as previewInvoiceRequest,
   previewPayout as previewPayoutRequest,
   refreshInvoice as refreshInvoiceRequest,
@@ -69,6 +71,7 @@ import {
   sendInvoiceReminder as sendInvoiceReminderRequest,
   setStoredToken,
   submitPointsFundingEvidence as submitPointsFundingEvidenceRequest,
+  uploadPointsFundingEvidence as uploadPointsFundingEvidenceRequest,
   suspendInvoiceReminderConfiguration as suspendInvoiceReminderConfigurationRequest,
   updateFaq as updateFaqRequest,
   updateAdminInvoiceTemplate as updateAdminInvoiceTemplateRequest,
@@ -124,7 +127,7 @@ function readCachedBootstrap() {
 
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }
@@ -144,8 +147,8 @@ function writeCachedBootstrap(payload) {
         cachedAt: new Date().toISOString()
       })
     );
-  } catch (_error) {
-    void _error;
+  } catch {
+    // Ignore storage restrictions in embedded webviews.
   }
 }
 
@@ -206,7 +209,7 @@ function loadTopUpOrders(userId) {
       window.localStorage.getItem(getLegacyTopUpOrdersStorageKey(userId));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
-  } catch (_error) {
+  } catch {
     return [];
   }
 }
@@ -472,6 +475,7 @@ export function AppContextProvider({ children }) {
   const [adminTopUpOrders, setAdminTopUpOrdersState] = useState([]);
   const [pointsFundingConfig, setPointsFundingConfigState] = useState({ packages: [], payment_destination: null, evidence_policy: null });
   const [pointsFundingRequests, setPointsFundingRequestsState] = useState([]);
+  const [notifications, setNotificationsState] = useState([]);
   const [paymentProviders, setPaymentProvidersState] = useState([]);
   const [providerCapabilities, setProviderCapabilitiesState] = useState([]);
   const [providerCapabilitiesLoaded, setProviderCapabilitiesLoaded] = useState(false);
@@ -601,12 +605,6 @@ export function AppContextProvider({ children }) {
     applyBootstrap(payload);
     return payload.testimonials || [];
   }, [applyBootstrap]);
-
-  const fetchProfile = useCallback(async () => {
-    const snapshot = await getMe();
-    const applied = applySnapshot(snapshot);
-    return applied?.profile || null;
-  }, [applySnapshot]);
 
   const fetchCommandCenter = useCallback(async () => {
     // Gate behind authentication
@@ -982,6 +980,30 @@ export function AppContextProvider({ children }) {
     }
   }, []);
 
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const payload = await listNotificationsRequest({ limit: 50 });
+      const records = Array.isArray(payload?.data) ? payload.data : [];
+      setNotificationsState(records);
+      return records;
+    } catch (error) {
+      console.error('Failed to fetch notifications', error);
+      return [];
+    }
+  }, []);
+
+  const markNotificationRead = useCallback(async (notificationId) => {
+    try {
+      const payload = await markNotificationReadRequest(notificationId);
+      setNotificationsState((previous) => previous.map((notification) => (
+        notification.id === notificationId ? payload.notification : notification
+      )));
+      return { success: true, notification: payload.notification };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }, []);
+
   const authenticateTelegramMiniApp = useCallback(async () => {
     if (!telegramInitData) {
       authStateManager.recordError({
@@ -1239,7 +1261,8 @@ export function AppContextProvider({ children }) {
 
     void fetchPointsFundingConfig();
     void fetchPointsFundingRequests();
-  }, [fetchPointsFundingConfig, fetchPointsFundingRequests, user?.id]);
+    void fetchNotifications();
+  }, [fetchNotifications, fetchPointsFundingConfig, fetchPointsFundingRequests, user?.id]);
 
   const retryInitialization = useCallback(() => {
     authStateManager.resetRetries();
@@ -1271,6 +1294,7 @@ export function AppContextProvider({ children }) {
     setAdminTopUpOrdersState([]);
     setPointsFundingConfigState({ packages: [], payment_destination: null, evidence_policy: null });
     setPointsFundingRequestsState([]);
+    setNotificationsState([]);
     setPaymentProvidersState([]);
     setProviderHealthState([]);
     setProviderBalancesState({});
@@ -1560,6 +1584,28 @@ export function AppContextProvider({ children }) {
     try {
       const payload = await submitPointsFundingEvidenceRequest(requestId, {
         evidence: input.evidence,
+        userTransactionReference: input.userTransactionReference || '',
+        userNote: input.userNote || ''
+      });
+      const fundingRequest = normalizeFundingRequest(payload?.funding_request);
+      setPointsFundingRequestsState((previous) => upsertByKey(previous, fundingRequest, 'id'));
+      fetchCommandCenter();
+      return { success: true, fundingRequest };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }, [fetchCommandCenter, user?.id]);
+
+  const uploadPointsFundingEvidence = useCallback(async (requestId, input = {}) => {
+    if (!user?.id) {
+      return { success: false, message: 'Authentication required' };
+    }
+
+    try {
+      const payload = await uploadPointsFundingEvidenceRequest(requestId, {
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        contentBase64: input.contentBase64,
         userTransactionReference: input.userTransactionReference || '',
         userNote: input.userNote || ''
       });
@@ -1945,6 +1991,7 @@ export function AppContextProvider({ children }) {
     adminTopUpOrders,
     pointsFundingConfig,
     pointsFundingRequests,
+    notifications,
     paymentProviders,
     providerCapabilities,
     providerCapabilitiesLoaded,
@@ -1974,6 +2021,8 @@ export function AppContextProvider({ children }) {
     fetchAdminTopUpOrders,
     fetchPointsFundingConfig,
     fetchPointsFundingRequests,
+    fetchNotifications,
+    markNotificationRead,
     createInvoice,
     previewInvoice,
     createPayout,
@@ -2004,6 +2053,7 @@ export function AppContextProvider({ children }) {
     updateTopUpOrderStatus,
     createPointsFundingRequest,
     submitPointsFundingEvidence,
+    uploadPointsFundingEvidence,
     completeTopUpOrder,
     cancelTopUpOrder,
     faqs,
