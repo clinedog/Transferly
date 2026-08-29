@@ -12,6 +12,7 @@ const { registerRoutes } = require('../routes');
 const {
   buildClientHealthPayload,
   buildHealthPayload,
+  buildDetailedHealth,
   createHttpRequestLogger
 } = require('../core/observability/httpObservability');
 const {
@@ -54,6 +55,36 @@ function configureHttpKernel(app) {
 
   app.get('/api/v1/health/client', (request, response) => {
     response.json(buildClientHealthPayload({ request, config }));
+  });
+
+  app.get('/api/health/detailed', async (request, response) => {
+    const { checks, degradedReasons } = await buildDetailedHealth({ config });
+    const degraded = degradedReasons.length > 0;
+    response.status(degraded ? 503 : 200).json({
+      ok: !degraded,
+      status: degraded ? 'degraded' : 'healthy',
+      requestId: request.id,
+      timestamp: new Date().toISOString(),
+      environment: config.NODE_ENV,
+      uptimeSeconds: Math.round(process.uptime()),
+      checks,
+      degradedReasons
+    });
+  });
+
+  app.get('/api/v1/health/detailed', async (request, response) => {
+    const { checks, degradedReasons } = await buildDetailedHealth({ config });
+    const degraded = degradedReasons.length > 0;
+    response.status(degraded ? 503 : 200).json({
+      ok: !degraded,
+      status: degraded ? 'degraded' : 'healthy',
+      requestId: request.id,
+      timestamp: new Date().toISOString(),
+      environment: config.NODE_ENV,
+      uptimeSeconds: Math.round(process.uptime()),
+      checks,
+      degradedReasons
+    });
   });
 
   // Expose the discovery-backed provider registry to runtime integrations.

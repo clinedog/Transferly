@@ -4,6 +4,7 @@ const { test } = require('node:test');
 
 const {
   buildClientHealthPayload,
+  buildDetailedHealth,
   buildHealthPayload,
   createHttpRequestLogger
 } = require('../core/observability/httpObservability');
@@ -149,4 +150,45 @@ test('createHttpRequestLogger logs sanitized request completion metadata', () =>
       message: 'HTTP request completed'
     }
   ]);
+});
+test('buildDetailedHealth reports database, redis, telegram, paypal, auth checks', async () => {
+  const config = createConfig({
+    INLINE_QUEUE_MODE: true,
+    PAYPAL_CLIENT_ID: 'paypal-id-1234',
+    PAYPAL_CLIENT_SECRET: 'paypal-secret-1234',
+    PAYPAL_WEBHOOK_ID: 'paypal-webhook-1234',
+    ADMIN_API_TOKEN: 'admin-token-1234',
+    BOT_API_HMAC_SECRET: 'hmac-secret-1234',
+    JWT_SECRET: 'jwt-secret-1234-1234-1234-1234'
+  });
+
+  const { checks, degradedReasons } = await buildDetailedHealth({ config });
+
+  assert.ok(checks.database, 'database check should exist');
+  assert.equal(checks.queue.mode, 'inline');
+  assert.equal(checks.queue.status, 'healthy');
+  assert.equal(checks.telegram.botToken, true);
+  assert.equal(checks.telegram.miniAppUrl, true);
+  assert.equal(checks.telegram.status, 'healthy');
+  assert.equal(checks.paypal.status, 'healthy');
+  assert.equal(checks.auth.status, 'healthy');
+  assert.deepEqual(degradedReasons, []);
+});
+
+test('buildDetailedHealth marks degraded when critical config is missing', async () => {
+  const config = createConfig({
+    INLINE_QUEUE_MODE: true,
+    PAYPAL_CLIENT_ID: '',
+    PAYPAL_CLIENT_SECRET: '',
+    PAYPAL_WEBHOOK_ID: '',
+    TELEGRAM_BOT_TOKEN: '',
+    TELEGRAM_MINI_APP_URL: ''
+  });
+
+  const { checks, degradedReasons } = await buildDetailedHealth({ config });
+
+  assert.equal(checks.telegram.status, 'degraded');
+  assert.equal(checks.paypal.status, 'degraded');
+  assert.ok(degradedReasons.includes('telegram_bot_token_missing'));
+  assert.ok(degradedReasons.includes('telegram_mini_app_url_missing'));
 });
