@@ -10,6 +10,7 @@ import {
   Clock3,
   Loader2,
   ShieldCheck,
+  Sparkles,
   XCircle
 } from 'lucide-react';
 
@@ -63,9 +64,104 @@ export function StatusBadge({ status = 'pending', animated = true, size = 'md', 
       label: 'Rejected',
       meaning: 'Rejected',
     },
+    // Funding-specific states
+    payment_instructions: {
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      text: 'text-blue-700 dark:text-blue-300',
+      dot: 'bg-blue-500',
+      icon: Clock3,
+      label: 'Awaiting Payment',
+      meaning: 'Make payment to receive points',
+    },
+    payment_reported: {
+      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      text: 'text-amber-700 dark:text-amber-300',
+      dot: 'bg-amber-500',
+      icon: Loader2,
+      label: 'Under Review',
+      meaning: 'Payment evidence is being verified',
+    },
+    under_review: {
+      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      text: 'text-amber-700 dark:text-amber-300',
+      dot: 'bg-amber-500',
+      icon: Loader2,
+      label: 'Under Review',
+      meaning: 'Verification in progress',
+    },
+    points_credited: {
+      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      dot: 'bg-emerald-500',
+      icon: CheckCircle2,
+      label: 'Credited',
+      meaning: 'Points added to your wallet',
+    },
+    needs_more_information: {
+      bg: 'bg-orange-50 dark:bg-orange-900/20',
+      text: 'text-orange-700 dark:text-orange-300',
+      dot: 'bg-orange-500',
+      icon: AlertTriangle,
+      label: 'Info Needed',
+      meaning: 'Additional details required',
+    },
+    awaiting_confirmation: {
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      text: 'text-blue-700 dark:text-blue-300',
+      dot: 'bg-blue-500',
+      icon: Loader2,
+      label: 'Awaiting',
+      meaning: 'Waiting for confirmation',
+    },
+    cancelled: {
+      bg: 'bg-slate-100 dark:bg-slate-800/20',
+      text: 'text-slate-600 dark:text-slate-400',
+      dot: 'bg-slate-500',
+      icon: XCircle,
+      label: 'Cancelled',
+      meaning: 'Order cancelled',
+    },
+    expired: {
+      bg: 'bg-slate-100 dark:bg-slate-800/20',
+      text: 'text-slate-600 dark:text-slate-400',
+      dot: 'bg-slate-500',
+      icon: Clock3,
+      label: 'Expired',
+      meaning: 'Order expired',
+    },
+    draft: {
+      bg: 'bg-slate-100 dark:bg-slate-800/20',
+      text: 'text-slate-600 dark:text-slate-400',
+      dot: 'bg-slate-500',
+      icon: Sparkles,
+      label: 'Draft',
+      meaning: 'Not yet submitted',
+    },
+    live: {
+      bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      dot: 'bg-emerald-500',
+      icon: CheckCircle2,
+      label: 'Live',
+      meaning: 'Active and working',
+    },
+    coming_soon: {
+      bg: 'bg-purple-50 dark:bg-purple-900/20',
+      text: 'text-purple-700 dark:text-purple-300',
+      dot: 'bg-purple-500',
+      icon: Sparkles,
+      label: 'Coming Soon',
+      meaning: 'Not yet available',
+    },
   };
 
-  const config = statusConfig[status] || statusConfig.pending;
+  // Normalize status to match keys (handle uppercase, spaces, hyphens)
+  const normalizedStatus = (status || 'pending')
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/-/g, '_');
+  const config = statusConfig[normalizedStatus] || statusConfig.pending;
   const Icon = config.icon;
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs',
@@ -85,13 +181,13 @@ export function StatusBadge({ status = 'pending', animated = true, size = 'md', 
     >
       <Icon
         size={size === 'lg' ? 16 : 14}
-        className={`${config.text} ${status === 'processing' && animated ? 'motion-safe:animate-spin' : ''}`}
+        className={`${config.text} ${normalizedStatus === 'processing' && animated ? 'motion-safe:animate-spin' : ''}`}
         aria-hidden="true"
       />
       <span
         className={`
           h-2 w-2 rounded-full ${config.dot}
-          ${animated && status !== 'completed' ? 'motion-safe:animate-pulse-subtle' : ''}
+          ${animated && normalizedStatus !== 'completed' && normalizedStatus !== 'approved' && normalizedStatus !== 'points_credited' ? 'motion-safe:animate-pulse-subtle' : ''}
         `}
         aria-hidden="true"
       />

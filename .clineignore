@@ -1,0 +1,83 @@
+# Files and directories that Cline should ignore
+# This file is deprecated soon in favor of native .gitignore patterns and MCP configuration
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.env
+config/secrets.json
+
+# Production databases
+data/*.db
+*.sqlite
+*.sqlite3
+
+# Build artifacts
+dist/
+build/
+out/
+.plop-preview/
+
+# Logs and ephemeral files
+*.log
+logs/
+*.tmp
+
+# IDE and editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Git
+.git/
+
+# Generated documentation
+docs/generated/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Test artifacts
+/playwright-report/
+/test-results/
+/test/artifact/
+
+# TypeScript build outputs
+*.tsbuildinfo
+
+# Package lock files (optional - keep if using semantic versioning)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# MCP server temporary files
+.mcp/
+
+# Checkpoint artifacts (if not using built-in checkpoint feature)
+.cline-checkpoints/
+.shadow/
+
+# Memory bank backups
+.memory-bank-backup/
+
+# Large binary files for codegen
+large-files/
+*.bin
+*.exe
+*.so
+*.dll
+
+# Provider webhook test files
+test/fixtures/webhooks/raw/

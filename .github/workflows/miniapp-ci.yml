@@ -37,6 +37,8 @@ jobs:
 
       - name: Install miniapp dependencies
         run: npm ci --prefix miniapp
+46 |       - name: Generate PayPal icons (test)
+47 |         run: npm run test:icons
 
       - name: Run npm audit (fail on high)
         run: npm audit --prefix miniapp --audit-level=high

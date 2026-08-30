@@ -4,8 +4,8 @@
   "description": "Transferly Telegram Mini App frontend",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "npm run generate:icons --prefix .. && vite",
+    "build": "npm run generate:icons --prefix .. && vite build",
     "preview": "vite preview",
     "smoke:providers": "node scripts/providerRouteSmoke.mjs",
     "test:e2e": "playwright test",

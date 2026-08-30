@@ -1,0 +1,5 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run icon generation and its test before allowing a commit.
+npm run precommit

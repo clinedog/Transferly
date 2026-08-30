@@ -1,0 +1,132 @@
+{
+  "projectName": "Transferly",
+  "version": "1.0.0",
+  "description": "Transferly - Cross-platform money transfer API, Telegram bot, and Mini App",
+
+  "checkpoints": {
+    "enabled": true,
+    "maxHistory": 50,
+    "autoCreate": true
+  },
+
+  "contextCompaction": {
+    "enabled": true,
+    "threshold": 0.8
+  },
+
+  "autoApprove": {
+    "readFiles": true,
+    "safeCommands": [
+      "npm run lint",
+      "npm test",
+      "npm run build",
+      "npm run validate:skills",
+      "npm run scan:secrets",
+      "npm run check:production",
+      "npm run verify:staging",
+      "npm run check:miniapp:bundle",
+      "npm run verify:release"
+    ],
+    "readOnlyCommands": [
+      "ls",
+      "cat",
+      "head",
+      "tail",
+      "grep",
+      "rg",
+      "find",
+      "git status",
+      "git diff",
+      "git log",
+      "node -c"
+    ]
+  },
+
+  "features": {
+    "subagents": true,
+    "agentTeams": true,
+    "memoryBank": true,
+    "hooks": true,
+    "mcp": true,
+    "browserAutomation": false,
+    "yoloMode": false
+  },
+
+  "mcp": {
+    "enabled": true,
+    "servers": {
+      "cline": {
+        "transport": "http",
+        "endpoint": "https://docs.cline.bot/mcp"
+      }
+    }
+  },
+
+  "skills": {
+    "enabled": true,
+    "localPath": ".cline/skills",
+    "codexBridge": ".codex/skills",
+    "validateOnStartup": true
+  },
+
+  "hooks": {
+    "preToolUse": [
+      "validate_patch_scope",
+      "block_destructive_commands",
+      "confirm_high_impact_operations"
+    ],
+    "postToolUse": [
+      "restate_changes",
+      "run_validation_after_edits"
+    ],
+    "preCompact": [
+      "emit_recovery_note"
+    ],
+    "taskComplete": [
+      "summarize_changes",
+      "list_validation_results",
+      "note_remaining_risks"
+    ]
+  },
+
+  "packages": {
+    "api": {
+      "lint": "npm run lint --prefix api",
+      "test": "npm test --prefix api",
+      "migrate": "npm run db:migrate --prefix api"
+    },
+    "bot": {
+      "test": "npm test --prefix bot"
+    },
+    "miniapp": {
+      "build": "npm run build --prefix miniapp",
+      "test:e2e:list": "npm run test:e2e:list --prefix miniapp",
+      "test:e2e": "npm run test:e2e --prefix miniapp"
+    }
+  },
+
+  "releaseGates": [
+    "npm run check:production",
+    "npm run verify:staging",
+    "npm run check:miniapp:bundle",
+    "npm run scan:secrets",
+    "npm run verify:release"
+  ],
+
+  "security": {
+    "neverLog": [
+      "PayPal secrets",
+      "Bearer tokens",
+      "Webhook headers",
+      "Raw sensitive payloads",
+      "Real .env files",
+      "Production databases",
+      "Service-role keys"
+    ],
+    "validateAtBoundary": true,
+    "useZod": true,
+    "sqliteTransactions": true,
+    "idempotencyKeys": true,
+    "auditLogs": true
+  }
+}

@@ -10,7 +10,7 @@
     "format:check": "npm run lint --prefix api",
     "test": "npm test --prefix api && npm test --prefix bot",
     "build": "npm run build --prefix miniapp",
-    "verify": "npm run lint --prefix api && npm test --prefix api && npm test --prefix bot && npm run build --prefix miniapp",
+    "verify": "npm run lint --prefix api && npm test --prefix api && npm test --prefix bot && npm run test:icons && npm run build --prefix miniapp",
     "check:production": "node scripts/check-production-readiness.js",
     "verify:staging": "node scripts/verify-staging.js",
     "check:miniapp:bundle": "node scripts/check-miniapp-bundle-budget.js",
@@ -26,10 +26,20 @@
     "bot:setup": "npm run setup --prefix bot",
     "miniapp:dev": "npm run dev --prefix miniapp",
     "miniapp:e2e": "npm run test:e2e --prefix miniapp",
-    "miniapp:e2e:list": "npm run test:e2e:list --prefix miniapp"
+    "miniapp:e2e:list": "npm run test:e2e:list --prefix miniapp",
+    "generate:icons": "node scripts/generate-paypal-icons.js",
+    "test:icons": "node --test ./scripts/__tests__/generate-paypal-icons.test.js",
+    "precommit": "npm run generate:icons && npm run test:icons",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "globals": "^17.7.0"
+    "globals": "^17.7.0",
+    "postcss": "^8.5.26",
+    "postcss-safe-parser": "^7.0.1",
+    "husky": "^9.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
   }
 }

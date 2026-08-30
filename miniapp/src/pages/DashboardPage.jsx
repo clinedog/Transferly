@@ -1,52 +1,50 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, CheckCircle2, Coins, FileClock, FileText, LifeBuoy, Sparkles, Users, Wallet, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  FileClock,
+  LifeBuoy,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Wallet,
+  X
+} from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import ServiceLogo from '../components/ServiceLogo';
 import { dashboardPreviewSlugs, getServiceBySlug } from '../lib/servicesCatalog';
-import { GlassCard, BalanceCard, StatGrid, PremiumButton } from '../components/ui';
+import { isServiceAvailable } from '../lib/serviceCatalogueContract';
+import { StatusBadge } from '../components/ui';
 
-const featuredTools = [
-  {
-    title: 'AI Reply',
-    badge: 'New',
-    body: 'Paste a message or screenshot and clean up the response before sending.',
-    icon: Bot,
-    to: '/services/ai-reply'
-  },
-  {
-    title: 'Articles (FMT)',
-    badge: 'Utility',
-    body: 'Use your points on quick utility surfaces and content-led workflows.',
-    icon: Sparkles,
-    to: '/services/articles'
-  },
-  {
-    title: 'Support Desk',
-    badge: 'Suite',
-    body: 'Support workflows and escalation utilities live in the same service board.',
-    icon: Users,
-    to: '/services/support-sites'
-  },
-  {
-    title: 'Opay',
-    badge: 'Popular',
-    body: 'Jump straight into wallet-record creation from a popular service tile.',
-    icon: FileText,
-    to: '/services/opay'
-  }
+// PayPal is the hero service for this MVP
+const heroService = {
+  slug: 'paypal',
+  title: 'PayPal',
+  badge: 'Live',
+  status: 'available',
+  description: 'Send invoices, request payouts, and manage your PayPal payments directly.',
+  launchTo: '/services/paypal',
+  launchLabel: 'Open PayPal',
+  accent: { bg: '#003087', fg: '#ffffff', edge: '#1d4ed8' },
+  mark: 'PP',
+};
+
+// Coming soon services - intentional, not broken
+const comingSoonServices = [
+  { slug: 'stripe', title: 'Stripe' },
+  { slug: 'paystack', title: 'Paystack' },
+  { slug: 'flutterwave', title: 'Flutterwave' },
+  { slug: 'crypto', title: 'Crypto' },
 ];
 
 const TELEGRAM_MODAL_KEY = 'transferly_telegram_community_seen';
 
 function TelegramCommunityModal() {
   const [open, setOpen] = React.useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
+    if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(TELEGRAM_MODAL_KEY) !== 'true';
   });
 
@@ -57,15 +55,13 @@ function TelegramCommunityModal() {
     setOpen(false);
   };
 
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   const benefits = [
     { icon: LifeBuoy, text: 'Get help & answers to your questions' },
     { icon: Wallet, text: 'Learn how to buy & manage points' },
     { icon: CheckCircle2, text: "Report vendors who haven't released points" },
-    { icon: Sparkles, text: 'Updates, tips & community support' }
+    { icon: Sparkles, text: 'Updates, tips & community support' },
   ];
 
   return (
@@ -93,342 +89,377 @@ function TelegramCommunityModal() {
         <div className="mt-6 space-y-3">
           {benefits.map((benefit) => {
             const Icon = benefit.icon;
-
             return (
-              <div key={benefit.text} className="flex items-center gap-3 rounded-[18px] bg-[#f8f7f3] px-4 py-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm">
-                  <Icon size={17} />
-                </div>
-                <p className="text-sm font-bold text-slate-700">{benefit.text}</p>
+              <div
+                key={benefit.text}
+                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#229ed9]/10 text-[#229ed9]">
+                  <Icon size={16} aria-hidden="true" />
+                </span>
+                <span className="text-sm font-bold text-slate-700">{benefit.text}</span>
               </div>
             );
           })}
         </div>
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 grid gap-3">
           <a
             href="https://t.me/+DhQqLRVqOHpmMmQ0"
             target="_blank"
             rel="noreferrer"
             onClick={close}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#229ed9] px-5 py-3 text-sm font-black text-white transition hover:bg-[#1b8fc6]"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-[#229ed9] px-5 py-3 text-sm font-black text-white transition hover:opacity-90"
           >
             Join Telegram Channel
-            <ArrowRight size={16} />
           </a>
           <button
             type="button"
             onClick={close}
-            className="inline-flex w-full items-center justify-center rounded-full border border-[#ece7dd] bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+            className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:border-slate-300"
           >
             I&apos;ve already joined
           </button>
-          <p className="text-center text-xs font-semibold text-slate-400">
-            You can also join from your settings page later
-          </p>
         </div>
       </div>
     </div>
   );
 }
 
+function PointsConversionNote() {
+  return (
+    <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+      1 Point = ₦1
+    </p>
+  );
+}
+
 export default function DashboardPage() {
-  const { user, profile, config, receipts, topUpOrders } = useAppContext();
+  const { user, profile, config, topUpOrders, pointsFundingRequests } = useAppContext();
   const brand = config?.brand_color || '#f8812d';
-  const firstName = (profile?.name || user?.email || 'User').split(' ')[0];
-  const referralLink = typeof window === 'undefined'
-    ? ''
-    : `https://t.me/TransferlyBot?start=${profile?.referral_code || ''}`;
-  const previewServices = dashboardPreviewSlugs
-    .map((slug) => getServiceBySlug(slug))
-    .filter(Boolean);
-  const recentTopUpOrder = topUpOrders[0] || null;
+  const firstName = (profile?.name || user?.email || 'there').split(' ')[0];
 
-  const activitySummary = useMemo(() => ([
-    {
-      label: 'Total Balance',
-      value: (profile?.points || 0).toLocaleString(),
-      suffix: 'pts',
-      icon: Wallet
-    },
-    {
-      label: 'Receipts',
-      value: receipts.length.toLocaleString(),
-      suffix: '',
-      icon: FileText
-    },
-    {
-      label: 'Referrals',
-      value: (profile?.referral_count || 0).toLocaleString(),
-      suffix: '',
-      icon: Users
-    },
-    {
-      label: 'Funding orders',
-      value: topUpOrders.length.toLocaleString(),
-      suffix: '',
-      icon: Coins
-    }
-  ]), [profile?.points, profile?.referral_count, receipts.length, topUpOrders.length]);
+  // PayPal-focused service preview: PayPal first, then other available services
+  const availableServices = useMemo(
+    () =>
+      dashboardPreviewSlugs
+        .map((slug) => getServiceBySlug(slug))
+        .filter(Boolean)
+        .filter(isServiceAvailable),
+    []
+  );
 
-  const copyReferralLink = async () => {
-    if (!referralLink) {
-      return;
-    }
+  const awaitingFunding = useMemo(
+    () =>
+      (pointsFundingRequests || []).filter((r) =>
+        ['PAYMENT_INSTRUCTIONS', 'PAYMENT_REPORTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION'].includes(
+          r.status
+        )
+      ),
+    [pointsFundingRequests]
+  );
 
-    try {
-      await navigator.clipboard.writeText(referralLink);
-      toast.success('Referral link copied');
-    } catch {
-      toast.error('Unable to copy referral link');
-    }
-  };
+  const recentTopUp = topUpOrders[0] || null;
+  const pointsBalance = Number(profile?.points || 0);
+
+  const quickActions = [
+    { label: 'Buy Points', icon: TrendingUp, to: '/buy-point', tone: 'primary' },
+    { label: 'Services', icon: Sparkles, to: '/services', tone: 'default' },
+    { label: 'Orders', icon: FileClock, to: '/orders', tone: 'default' },
+    { label: 'Transactions', icon: Wallet, to: '/history', tone: 'default' },
+  ];
 
   return (
     <DashboardLayout>
       <TelegramCommunityModal />
-      <div className="animate-fade-in space-y-8 px-4 py-5 md:px-8 md:py-8">
-        
-        {/* Premium Hero Section */}
-        <section className="animate-slide-down">
-          <GlassCard className="p-8 md:p-12 bg-gradient-to-br from-orange-500 to-orange-600">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-4 flex-1">
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-white/80 uppercase tracking-wider">Welcome back,</p>
-                  <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white">
-                    {firstName} 👋
-                  </h1>
-                </div>
-                <p className="max-w-2xl text-sm md:text-base leading-relaxed text-white/90">
-                  Keep your balance topped up, launch the service you need, and move between receipt work, email work,
-                  and utility actions from one account.
-                </p>
-              </div>
-              <PremiumButton 
-                variant="secondary"
-                size="lg"
-                icon={Wallet}
-                onClick={() => window.location.href = '/buy-point'}
-              >
-                Buy Points
-              </PremiumButton>
-            </div>
-          </GlassCard>
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-8">
+        {/* Header - Welcome with action */}
+        <section className="flex flex-col gap-2">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Dashboard</p>
+          <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
+            Welcome back, {firstName}
+          </h1>
         </section>
 
-        {/* Stats & Balance Section */}
-        <section className="animate-slide-up" style={{ animationDelay: '100ms' }}>
-          <BalanceCard 
-            label="Available Balance"
-            balance={profile?.points || 0}
-            currency="pts"
-            isVisible={true}
-          />
-        </section>
-
-        {/* Activity Summary Stats Grid */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-bold text-slate-950 dark:text-white">Your Activity</h2>
-          <StatGrid stats={activitySummary.slice(1).map((item) => ({
-            label: item.label,
-            value: item.value,
-            suffix: item.suffix,
-            icon: item.icon
-          }))} />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_360px]">
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-                <div className="rounded-[24px] bg-gradient-to-br from-slate-900 to-slate-800 p-6 text-white hover:shadow-lg-glass transition-all duration-300">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-black tracking-tight">Quick Actions</h2>
-                    <Wallet size={22} className="text-white/35" />
-                  </div>
-                  <div className="space-y-3">
-                    <PremiumButton 
-                      variant="secondary"
-                      size="md"
-                      onClick={() => window.location.href = '/buy-point'}
-                      className="w-full"
-                    >
-                      Buy Points
-                    </PremiumButton>
-                    <a
-                      href="https://t.me/+DhQqLRVqOHpmMmQ0"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center rounded-full border-2 border-white/20 bg-white/5 px-4 py-3 text-sm font-black text-white transition hover:bg-white/10"
-                    >
-                      Join Vendor
-                    </a>
-                    <button
-                      onClick={copyReferralLink}
-                      className="flex items-center justify-center rounded-full border-2 border-white/20 bg-white/5 px-4 py-3 text-sm font-black text-white transition hover:bg-white/10 w-full"
-                    >
-                      Copy Ref Link
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 hover:shadow-lg-glass transition-all duration-300">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Featured</p>
-                      <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">AI Reply</h2>
-                    </div>
-                    <Bot size={22} className="text-orange-500 opacity-60" />
-                  </div>
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    Smart AI-powered replies for any conversation.
-                  </p>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    {featuredTools.slice(1, 3).map((tool) => (
-                      <Link
-                        key={tool.title}
-                        to={tool.to}
-                        className="rounded-2xl bg-slate-50 dark:bg-slate-800 px-4 py-4 text-sm font-bold text-slate-950 dark:text-white shadow-sm transition hover:bg-orange-50 dark:hover:bg-orange-900/30 hover:shadow-md-glass"
-                      >
-                        <p>{tool.title}</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{tool.badge}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-          <div className="rounded-[30px] bg-[#121212] p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
-            <div className="flex items-center justify-between">
+        {/* BALANCE HERO - Answers "How many points do I have?" */}
+        <section>
+          <div
+            className="rounded-[28px] p-6 text-white shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
+            style={{ background: `linear-gradient(135deg, #0f172a 0%, #1e293b 100%)` }}
+          >
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/40">Service Access</p>
-                <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">Jump into the tools board.</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
+                  Available Balance
+                </p>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-5xl font-black tracking-[-0.04em] md:text-6xl">
+                    {pointsBalance.toLocaleString()}
+                  </span>
+                  <span className="text-lg font-semibold text-white/70">Points</span>
+                </div>
+                <p className="mt-1 text-sm font-bold text-white/60">
+                  ≈ ₦{pointsBalance.toLocaleString()}
+                </p>
+                <PointsConversionNote />
               </div>
-              <Sparkles size={20} className="text-white/35" />
+              <div className="hidden md:block">
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: `${brand}33` }}
+                >
+                  <Wallet className="h-7 w-7" style={{ color: brand }} />
+                </div>
+              </div>
             </div>
-
-            <div className="mt-6 space-y-3">
-              <Link
-                to="/services"
-                className="flex items-center justify-between rounded-[24px] bg-white px-4 py-4 text-slate-950 transition hover:bg-orange-50"
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => (window.location.href = '/buy-point')}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white transition active:scale-[0.99]"
+                style={{ backgroundColor: brand }}
               >
-                <div>
-                  <p className="text-sm font-black">Services</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Open the full catalog</p>
-                </div>
-                <ArrowRight size={18} />
-              </Link>
+                <TrendingUp size={16} />
+                Buy Points
+              </button>
               <Link
-                to="/orders"
-                className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 transition hover:bg-white/10"
+                to="/wallet"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-black text-white transition hover:bg-white/10"
               >
-                <div>
-                  <p className="text-sm font-black">Orders</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/42">Recent activity</p>
-                </div>
-                <FileClock size={18} />
-              </Link>
-              <Link
-                to="/transactions"
-                className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 transition hover:bg-white/10"
-              >
-                <div>
-                  <p className="text-sm font-black">History</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/42">Usage and funding</p>
-                </div>
-                <FileText size={18} />
+                <Wallet size={16} />
+                View Wallet
               </Link>
             </div>
           </div>
         </section>
 
-        {recentTopUpOrder ? (
-          <section className="rounded-[30px] border border-[#ebe2d4] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Latest funding order</p>
-                <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">{recentTopUpOrder.amount_label}</h2>
-                <p className="mt-2 text-sm leading-7 text-slate-600">
-                  {recentTopUpOrder.method_title} · {recentTopUpOrder.status.replace(/_/g, ' ')} · created {new Date(recentTopUpOrder.created_at).toLocaleString()}
-                </p>
+        {/* ATTENTION BANNER - If funding needs review */}
+        {awaitingFunding.length > 0 ? (
+          <section>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <Clock3 size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-black text-amber-900">
+                    {awaitingFunding.length} funding {awaitingFunding.length === 1 ? 'request' : 'requests'} awaiting review
+                  </p>
+                  <p className="mt-0.5 text-xs font-bold text-amber-800/80">
+                    Your payment evidence is being verified. No action needed.
+                  </p>
+                </div>
+                <Link
+                  to="/wallet"
+                  className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white transition hover:bg-amber-700"
+                >
+                  Review
+                </Link>
               </div>
-              <Link
-                to={recentTopUpOrder.service_intent ? `/buy-point?intent=${recentTopUpOrder.service_intent}` : '/buy-point'}
-                className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black text-white transition hover:opacity-90"
-                style={{ backgroundColor: brand }}
-              >
-                Continue Funding
-                <ArrowRight size={16} />
-              </Link>
             </div>
           </section>
         ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-          {featuredTools.map((tool, index) => {
-            const Icon = tool.icon;
-            const dark = index === 0;
-
-            return (
-              <Link
-                key={tool.title}
-                to={tool.to}
-                className={`rounded-[28px] p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] transition hover:translate-y-[-2px] ${
-                  dark ? 'bg-[#121212] text-white' : 'border border-[#ebe2d4] bg-white text-slate-950'
-                }`}
-              >
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${dark ? 'bg-white/10 text-white' : 'bg-orange-50 text-orange-600'}`}>
-                  <Icon size={20} />
-                </div>
-                <div className="mt-5">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-black tracking-[-0.03em]">{tool.title}</h3>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${dark ? 'bg-white/10 text-orange-200' : 'bg-slate-100 text-slate-600'}`}>
-                      {tool.badge}
-                    </span>
+        {/* QUICK ACTIONS - Answers "What can I do now?" */}
+        <section>
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+            Quick Actions
+          </p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.label}
+                  to={action.to}
+                  className="group flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: action.tone === 'primary' ? `${brand}1a` : '#f1f5f9' }}
+                  >
+                    <Icon
+                      size={18}
+                      style={{ color: action.tone === 'primary' ? brand : '#475569' }}
+                    />
                   </div>
-                  <p className={`mt-3 text-sm leading-7 ${dark ? 'text-white/68' : 'text-slate-600'}`}>{tool.body}</p>
-                </div>
-              </Link>
-            );
-          })}
+                  <span className="text-xs font-black">{action.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </section>
 
-        <section className="rounded-[30px] border border-[#ebe2d4] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">All Services</p>
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">Browse the full Transferly services board.</h2>
+        {/* PAYPAL HERO - The active service */}
+        <section>
+          <Link
+            to={heroService.launchTo}
+            className="group flex items-center gap-4 rounded-3xl p-5 text-white shadow-[0_18px_48px_rgba(0,48,135,0.28)] transition hover:translate-y-[-2px]"
+            style={{ backgroundColor: heroService.accent.bg }}
+          >
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-black"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              {heroService.mark}
             </div>
-            <Link to="/services" className="inline-flex items-center gap-2 text-sm font-black text-slate-700 transition hover:text-slate-950">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-lg font-black tracking-[-0.02em]">{heroService.title}</p>
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-200">
+                  Available Now
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-white/75">
+                {heroService.description}
+              </p>
+            </div>
+            <ArrowRight
+              size={20}
+              className="shrink-0 text-white/60 transition group-hover:translate-x-1 group-hover:text-white"
+            />
+          </Link>
+        </section>
+
+        {/* AVAILABLE + COMING SOON SERVICES */}
+        <section>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Available */}
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                Available Services
+              </p>
+              <div className="space-y-2">
+                {availableServices
+                  .filter((s) => s.slug !== heroService.slug)
+                  .slice(0, 3)
+                  .map((service) => (
+                    <Link
+                      key={service.slug}
+                      to={`/services/${service.slug}`}
+                      className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      <ServiceLogo service={service} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-slate-950">
+                          {service.title}
+                        </p>
+                        {service.description ? (
+                          <p className="truncate text-xs font-semibold text-slate-500">
+                            {service.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <ArrowRight
+                        size={16}
+                        className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500"
+                      />
+                    </Link>
+                  ))}
+              </div>
+            </div>
+            {/* Coming Soon */}
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                More Coming Soon
+              </p>
+              <div className="space-y-2">
+                {comingSoonServices.map((svc) => (
+                  <div
+                    key={svc.slug}
+                    className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-3"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-200/50 text-slate-400">
+                      <Sparkles size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-slate-500">{svc.title}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        Coming Soon
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* RECENT ACTIVITY - Answers "What needs my attention?" */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+              Recent Activity
+            </p>
+            <Link
+              to="/history"
+              className="text-xs font-black text-slate-600 transition hover:text-slate-950"
+            >
               View all
-              <ArrowRight size={16} />
             </Link>
           </div>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {previewServices.map((service) => (
-              <Link
-                key={service.slug}
-                to={`/services/${service.slug}`}
-                className="group rounded-[22px] border border-[#ece7dd] bg-[#f8f7f3] px-4 py-4 transition hover:border-orange-200 hover:bg-orange-50"
-              >
-                <div className="flex items-start gap-3">
-                  <ServiceLogo service={service} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-slate-950">{service.title}</p>
-                        {service.badge === 'New' ? (
-                          <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-orange-500">New</p>
-                        ) : null}
-                      </div>
-                      <ArrowRight size={16} className="shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-slate-700" />
-                    </div>
+          {recentTopUp || awaitingFunding.length > 0 ? (
+            <div className="space-y-2">
+              {awaitingFunding.slice(0, 3).map((req) => (
+                <Link
+                  key={req.id || req.order_id}
+                  to="/wallet"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <Clock3 size={18} />
                   </div>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-slate-950">
+                      {Number(req.points || req.display_amount || 0).toLocaleString()} Points &middot; Under Review
+                    </p>
+                    <p className="text-[11px] font-bold text-slate-500">
+                      {new Date(req.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <StatusBadge status="pending" size="sm" animated={false} />
+                </Link>
+              ))}
+              {recentTopUp ? (
+                <Link
+                  to="/orders"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-slate-300"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50" style={{ color: brand }}>
+                    <TrendingUp size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-slate-950">
+                      {recentTopUp.amount_label || `${Number(recentTopUp.points || 0).toLocaleString()} pts`}
+                    </p>
+                    <p className="text-[11px] font-bold text-slate-500">
+                      {new Date(recentTopUp.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    status={recentTopUp.status === 'completed' ? 'completed' : 'pending'}
+                    size="sm"
+                    animated={false}
+                  />
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
+              <p className="text-sm font-black text-slate-700">No recent activity</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Your funding and service activity will appear here.
+              </p>
+              <Link
+                to="/buy-point"
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-black"
+                style={{ color: brand }}
+              >
+                Buy Points <ArrowRight size={12} />
               </Link>
-            ))}
-          </div>
+            </div>
+          )}
         </section>
       </div>
     </DashboardLayout>
