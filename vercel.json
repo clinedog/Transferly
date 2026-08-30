@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "miniapp/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "miniapp/dist",
+        "buildCommand": "npm run build --prefix miniapp"
+      }
+    }
+  ],
+  "routes": [{ "src": "/(.*)", "dest": "/$1" }]
+}

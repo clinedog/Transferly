@@ -1,0 +1,6 @@
+# Exclude everything by default
+*
+# Whitelist the miniapp source needed for the build
+!miniapp/**
+# Also include the root vercel configuration
+!vercel.json
