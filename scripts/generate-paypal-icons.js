@@ -58,6 +58,17 @@ function collectSvgs(dir, acc = []) {
 }
 
 function main() {
+  // Guard against missing mirror directory – this can happen in CI where the
+  // PayPal mirror is not checked out. Previously `collectSvgs` would throw when
+  // trying to read a non‑existent directory, bubbling up as an uncaught
+  // exception and causing `npm run build` to exit with code 254. We now handle
+  // the situation gracefully by emitting a warning and exiting early with a
+  // success status (0).
+  if (!fs.existsSync(MIRROR_ROOT)) {
+    console.warn('⚠️ PayPal mirror directory not found at', MIRROR_ROOT, '- skipping icon generation.');
+    return;
+  }
+
   // Ensure a clean, deterministic output – remove any previous file.
   if (fs.existsSync(OUT_FILE)) {
     try {
