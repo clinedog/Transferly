@@ -149,6 +149,27 @@ async function update(id, updates, client = db) {
   return findById(id, client);
 }
 
+async function claimForProcessing(id, client = db) {
+  const now = new Date().toISOString();
+  const result = await client.run(
+    `
+      UPDATE webhook_events
+      SET status = 'PROCESSING',
+          processing_attempts = processing_attempts + 1,
+          last_error = NULL,
+          updated_at = ?
+      WHERE id = ?
+        AND status IN ('VERIFIED', 'FAILED')
+    `,
+    [now, id]
+  );
+
+  return {
+    claimed: result.changes === 1,
+    webhookEvent: await findById(id, client)
+  };
+}
+
 module.exports = {
   webhookEventRepository: {
     create,
@@ -156,6 +177,7 @@ module.exports = {
     findById,
     findByIdentifier,
     findMany,
-    update
+    update,
+    claimForProcessing
   }
 };

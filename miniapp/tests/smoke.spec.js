@@ -1482,7 +1482,7 @@ test('mini app service catalog routes tiles into native service detail screens',
 
   await page.goto('/miniapp/services/opay');
   await expect(page.getByRole('heading', { name: 'Opay' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Unavailable' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Coming Soon' })).toBeDisabled();
   await expect(page.locator('a[href*="dashboard/generate"]')).toHaveCount(0);
 
   await page.goto('/miniapp/services');

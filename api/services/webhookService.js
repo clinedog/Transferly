@@ -311,12 +311,15 @@ async function processWebhookEvent(webhookEventId) {
     };
   }
 
-  const nextAttempt = webhookEvent.processingAttempts + 1;
-  await webhookEventRepository.update(webhookEvent.id, {
-    processingAttempts: nextAttempt
-  });
+  const claim = await webhookEventRepository.claimForProcessing(webhookEvent.id);
+  if (!claim.claimed) {
+    return {
+      status: claim.webhookEvent?.status || webhookEvent.status,
+      skipped: true
+    };
+  }
 
-  const event = webhookEvent.payload;
+  const event = claim.webhookEvent.payload;
 
   try {
     switch (webhookEvent.eventType) {

@@ -309,7 +309,7 @@ test('mini app wallet shows backend-backed funding status center and safe eviden
   await expect(page.getByText('Screenshot submission alone never changes your balance.')).toBeVisible();
   await expect(page.getByText('Evidence policy')).toBeVisible();
   await expect(page.getByText('JPEG, PNG, WEBP, PDF up to 8MB')).toBeVisible();
-  await expect(page.getByText('TP-20260829-ABC123')).toBeVisible();
+  await expect(page.getByText('TP-20260829-ABC123', { exact: true })).toBeVisible();
   await expect(page.getByText('₦5,000').first()).toBeVisible();
   await expect(page.getByText('Payment instructions')).toBeVisible();
   await expect(page.getByText('Request created')).toBeVisible();

@@ -963,7 +963,7 @@ export function AppContextProvider({ children }) {
       setPointsFundingConfigState(nextConfig);
       return nextConfig;
     } catch (error) {
-      console.error('Failed to fetch points funding config', error);
+      console.warn('Points funding config is temporarily unavailable', error);
       return { packages: [], payment_destination: null, evidence_policy: null };
     }
   }, []);
@@ -975,7 +975,7 @@ export function AppContextProvider({ children }) {
       setPointsFundingRequestsState(requests);
       return requests;
     } catch (error) {
-      console.error('Failed to fetch points funding requests', error);
+      console.warn('Points funding requests are temporarily unavailable', error);
       return [];
     }
   }, []);
@@ -987,7 +987,7 @@ export function AppContextProvider({ children }) {
       setNotificationsState(records);
       return records;
     } catch (error) {
-      console.error('Failed to fetch notifications', error);
+      console.warn('Notifications are temporarily unavailable', error);
       return [];
     }
   }, []);

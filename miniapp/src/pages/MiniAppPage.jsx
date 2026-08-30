@@ -4652,9 +4652,10 @@ export default function MiniAppPage() {
     ? (lane || routeTail.split('/').filter(Boolean)[0] || '')
     : '';
   const isProviderLaneRoute = Boolean(
-    activeServiceSlug === 'paypal' &&
+    activeServiceSlug &&
     activeProviderLane &&
-    isProviderManifestSlug(activeServiceSlug)
+    isProviderManifestSlug(activeServiceSlug) &&
+    (activeServiceSlug === 'paypal' || location.state?.legacyProviderRedirect)
   );
   const isProviderWorkspaceRoute = isProviderLaneRoute;
   const activeService = activeServiceSlug ? getServiceBySlug(activeServiceSlug) : null;

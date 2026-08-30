@@ -133,6 +133,32 @@ function LegacyServiceRedirect() {
   return <Navigate to={`/miniapp/services/${slug}${location.search}`} replace />;
 }
 
+function LegacyMiniAppProviderRedirect({ section }) {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const provider = String(params.get("provider") || "").toLowerCase();
+
+  if (!isProviderManifestSlug(provider)) {
+    return <MiniAppPage />;
+  }
+
+  const laneBySection = {
+    invoices: { paypal: "invoices", stripe: "payments" },
+    payouts: { crypto: "send", paypal: "payouts", stripe: "payouts" }
+  };
+  const requestedLane = laneBySection[section]?.[provider] || "overview";
+  const lane = isProviderLaneSupported(provider, requestedLane) ? requestedLane : "overview";
+  params.delete("provider");
+  const query = params.toString();
+  return (
+    <Navigate
+      to={getProviderWorkspaceRoute(provider, lane) + (query ? "?" + query : "")}
+      state={{ legacyProviderRedirect: true }}
+      replace
+    />
+  );
+}
+
 function AppRoutes({ location }) {
   return (
     <Routes location={location}>
@@ -146,6 +172,8 @@ function AppRoutes({ location }) {
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="/miniapp" element={<MiniAppPage />} />
+      <Route path="/miniapp/invoices" element={<LegacyMiniAppProviderRedirect section="invoices" />} />
+      <Route path="/miniapp/payouts" element={<LegacyMiniAppProviderRedirect section="payouts" />} />
       <Route path="/miniapp/:section" element={<MiniAppPage />} />
       <Route path="/miniapp/:section/:slug" element={<MiniAppPage />} />
       <Route path="/miniapp/services/:slug/:lane" element={<MiniAppPage />} />
