@@ -12,16 +12,21 @@ function buildErrorResponse(error, request, overrides = {}) {
     retryAfter: overrides.retryAfter || error?.retryAfter || null
   });
 
-  return {
+  const response = {
     code: error.code,
     message: error.message,
     details: error.details,
     classification: classification.class,
     retryable: classification.retryable,
     recovery,
-    requestId: request.id,
-    correlationId: request.correlationId
+    requestId: request.id
   };
+
+  if (request.correlationId) {
+    response.correlationId = request.correlationId;
+  }
+
+  return response;
 }
 
 function recordErrorMetric(error, request, statusCode) {

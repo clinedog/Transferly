@@ -17,15 +17,199 @@ const {
   POINT_TRANSACTION_TYPE,
   POINTS_FUNDING_STATUS,
   RISK_DOMAIN,
-  WEBHOOK_PROCESSING_STATUS
+  WEBHOOK_PROCESSING_STATUS,
+  LEDGER_ENTRY_TYPE
 } = require('../utils/constants');
+const { paymentOpsIssueRepository } = require('../repositories/paymentOpsIssueRepository');
 
 // How long (ms) a payout can stay in a non-terminal state before flagged stale
 const STALE_PAYOUT_MS = 24 * 60 * 60 * 1000; // 24 h
 const STALE_INVOICE_MS = 72 * 60 * 60 * 1000; // 72 h
 
 const TERMINAL_INVOICE = new Set([INVOICE_STATUS.PAID, INVOICE_STATUS.CANCELLED, INVOICE_STATUS.REFUNDED, INVOICE_STATUS.FAILED]);
-const TERMINAL_PAYOUT = new Set([PAYOUT_STATUS.SUCCESS, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.DENIED, PAYOUT_STATUS.REJECTED]);
+const TERMINAL_PAYOUT = new Set([PAYOUT_STATUS.SUCCESS, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.DENIED, PAYOUT_STATUS.REJECTED, PAYOUT_STATUS.QUEUED]);
+
+function isTerminalPayoutStatus(status) {
+  return TERMINAL_PAYOUT.has(status);
+}
+
+async function findDispositionMismatchInternal(payoutId) {
+  const payout = await payoutRepository.findById(payoutId);
+  if (!payout) return undefined;
+
+  const [settlements, refunds] = await Promise.all([
+    db.all(
+      `SELECT id, type, amount_cents, currency_code, debit_bucket, credit_bucket, created_at
+       FROM ledger_entries
+       WHERE reference_type = 'PAYOUT' AND reference_id = ? AND type = ?`,
+      [payoutId, LEDGER_ENTRY_TYPE.PAYOUT_SETTLED]
+    ),
+    db.all(
+      `SELECT id, type, amount_cents, currency_code, debit_bucket, credit_bucket, created_at
+       FROM ledger_entries
+       WHERE reference_type = 'PAYOUT' AND reference_id = ? AND type = ?`,
+      [payoutId, LEDGER_ENTRY_TYPE.PAYOUT_RELEASE_REFUND]
+    )
+  ]);
+
+  const settlementCount = settlements.length;
+  const refundCount = refunds.length;
+
+  // Contradictory: both settlement and refund dispositions exist
+  if (settlementCount > 0 && refundCount > 0) {
+    return {
+      type: 'payout_reservation_disposition_mismatch',
+      entityType: 'payout',
+      entityId: payoutId,
+      severity: 'critical',
+      settlementCount,
+      refundCount,
+      detail: `Payout ${payoutId} has both settlement and refund dispositions (contradictory)`
+    };
+  }
+
+  // Non-terminal payouts should not have any disposition yet
+  if (!isTerminalPayoutStatus(payout.status)) {
+    if (settlementCount > 0) {
+      return {
+        type: 'payout_reservation_disposition_mismatch',
+        entityType: 'payout',
+        entityId: payoutId,
+        severity: 'high',
+        settlementCount,
+        refundCount,
+        detail: `Payout ${payoutId} is in status ${payout.status} but has ${settlementCount} settlement(s) and ${refundCount} refund(s)`
+      };
+    }
+    if (refundCount > 0) {
+      return {
+        type: 'payout_reservation_disposition_mismatch',
+        entityType: 'payout',
+        entityId: payoutId,
+        severity: 'high',
+        settlementCount,
+        refundCount,
+        detail: `Payout ${payoutId} is in status ${payout.status} but has ${refundCount} refund(s)`
+      };
+    }
+    return undefined;
+  }
+
+  // Terminal payouts need exactly one valid disposition (settlement OR refund)
+  const totalDispositions = settlementCount + refundCount;
+
+  if (totalDispositions === 0) {
+    return {
+      type: 'payout_reservation_disposition_mismatch',
+      entityType: 'payout',
+      entityId: payoutId,
+      severity: 'critical',
+      settlementCount: 0,
+      refundCount: 0,
+      detail: `Payout ${payoutId} is ${payout.status} but has no disposition`
+    };
+  }
+
+  if (totalDispositions > 1) {
+    return {
+      type: 'payout_reservation_disposition_mismatch',
+      entityType: 'payout',
+      entityId: payoutId,
+      severity: 'critical',
+      settlementCount,
+      refundCount,
+      detail: `Payout ${payoutId} has ${totalDispositions} dispositions (expected 1)`
+    };
+  }
+
+  // Exactly one disposition — validate it matches the payout
+  const disposition = settlementCount > 0 ? settlements[0] : refunds[0];
+
+  if (Number(disposition.amount_cents) !== Number(payout.amountCents)) {
+    return {
+      type: 'payout_reservation_disposition_mismatch',
+      entityType: 'payout',
+      entityId: payoutId,
+      severity: 'critical',
+      settlementCount,
+      refundCount,
+      expectedAmountCents: Number(payout.amountCents),
+      actualAmountCents: Number(disposition.amount_cents),
+      detail: `Payout ${payoutId} disposition amount (${disposition.amount_cents}) does not match payout amount (${payout.amountCents})`
+    };
+  }
+
+  if (disposition.currency_code && String(disposition.currency_code) !== String(payout.currencyCode)) {
+    return {
+      type: 'payout_reservation_disposition_mismatch',
+      entityType: 'payout',
+      entityId: payoutId,
+      severity: 'critical',
+      settlementCount,
+      refundCount,
+      expectedCurrencyCode: payout.currencyCode,
+      actualCurrencyCode: disposition.currency_code,
+      detail: `Payout ${payoutId} disposition currency (${disposition.currency_code}) does not match payout currency (${payout.currencyCode})`
+    };
+  }
+
+  return undefined;
+}
+
+async function ensurePayoutDispositionIssue(payoutId, client = db) {
+  const mismatch = await findDispositionMismatchInternal(payoutId);
+
+  if (!mismatch) {
+    // No mismatch — resolve any existing OPEN issue for this payout
+    const existing = await paymentOpsIssueRepository.findByUniqueKey(
+      'payout',
+      payoutId,
+      'PAYOUT_RESERVATION_DISPOSITION_MISMATCH',
+      client
+    );
+    if (existing && existing.status === 'OPEN') {
+      
+  const payout = await payoutRepository.findById(payoutId, client)
+      return paymentOpsIssueRepository.updateById(existing.id, {
+        status: 'RESOLVED',
+        resolvedAt: new Date().toISOString(),
+        metadata: {
+          ...existing.metadata,
+          resolved_at: new Date().toISOString(),
+          resolved_by_actor_id: existing.metadata?.resolved_by_actor_id || null,
+          resolution_note: 'Disposition reconciled — no mismatch detected.'
+        }
+      }, client);
+    }
+    return undefined;
+  }
+
+  // Mismatch exists — create or refresh the OPEN issue
+  
+  const payout = await payoutRepository.findById(payoutId, client)
+  
+  const issue = await paymentOpsIssueRepository.upsert(
+    {
+      entityType: 'payout',
+      entityId: payoutId,
+      issueType: 'PAYOUT_RESERVATION_DISPOSITION_MISMATCH',
+      severity: mismatch.severity.toUpperCase(),
+      status: 'OPEN',
+      summary: mismatch.detail,
+      metadata: {
+        payout_id: payoutId,
+        payout_status: payout?.status || 'unknown',
+        settlement_count: mismatch.settlementCount ?? 0,
+        refund_count: mismatch.refundCount ?? 0,
+        mismatch_type: mismatch.type,
+        detail: mismatch.detail
+      }
+    },
+    client
+  );
+
+  return issue;
+}
 
 function ageMs(isoString) {
   return Date.now() - Date.parse(isoString || 0);
@@ -39,7 +223,8 @@ function buildAlertId(mismatch) {
 }
 
 async function persistReconciliationAlerts(mismatches) {
-  const now = new Date().toISOString();
+  
+  const payout = await payoutRepository.findById(payoutId, client)
   const alerts = [];
 
   for (const mismatch of mismatches) {
@@ -362,6 +547,19 @@ async function detectMismatches({ invoiceLimit = 50, payoutLimit = 50, webhookLi
     }
   }
 
+  // 6. Payout disposition mismatches — payouts in terminal status must have
+  //    exactly one settlement disposition with correct amount/currency
+  for (const payout of payouts) {
+    const mismatch = await reconciliationTimelineService
+      .findDispositionMismatch(payout.id);
+    if (mismatch) {
+      mismatches.push({
+        ...mismatch,
+        since: payout.updatedAt || payout.createdAt
+      });
+    }
+  }
+
   const alerts = await persistReconciliationAlerts(mismatches);
 
   return {
@@ -373,9 +571,17 @@ async function detectMismatches({ invoiceLimit = 50, payoutLimit = 50, webhookLi
   };
 }
 
+const reconciliationTimelineService = {
+  getEntityTimeline,
+  detectMismatches,
+  async findDispositionMismatch(payoutId) {
+    const mismatch = await findDispositionMismatchInternal(payoutId);
+    await ensurePayoutDispositionIssue(payoutId);
+    return mismatch;
+  },
+  ensurePayoutDispositionIssue
+};
+
 module.exports = {
-  reconciliationTimelineService: {
-    getEntityTimeline,
-    detectMismatches
-  }
+  reconciliationTimelineService
 };

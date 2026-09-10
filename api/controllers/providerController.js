@@ -23,6 +23,7 @@ const { providerHealthService } = require('../services/providerHealthService');
 const { providerReadinessService } = require('../services/providerReadinessService');
 const { providerStatusService } = require('../services/providerStatusService');
 const { paypalWorkspaceService } = require('../services/paypalWorkspaceService');
+const { providerWorkspaceService } = require('../services/providerWorkspaceService');
 const { providerRoutingService } = require('../services/providerRoutingService');
 const { PROVIDER_CONTRACT_VERSION } = require('../constants/providerWorkspaceContract');
 const { AUDIT_ACTOR_TYPE } = require('../utils/constants');
@@ -382,6 +383,32 @@ async function getProviderBalanceController(request, response) {
   });
   response.json({
     data: balance,
+    provider,
+    ...buildProviderContractMeta(request)
+  });
+}
+
+async function getProviderWalletController(request, response) {
+  const { provider } = parseProviderParams(request);
+  logProviderOperation(request, provider, 'wallet_lookup');
+  const wallet = providerWorkspaceService.getProviderWallet(provider, {
+    connectedAccountId: request.query?.connectedAccountId,
+    actorType: resolveAuditActorType(request),
+    actorId: resolveAuditActorId(request)
+  });
+  response.json({
+    data: wallet,
+    provider,
+    ...buildProviderContractMeta(request)
+  });
+}
+
+async function getProviderWorkspaceController(request, response) {
+  const { provider } = parseProviderParams(request);
+  logProviderOperation(request, provider, 'workspace_descriptor');
+  const workspace = providerWorkspaceService.getProviderWorkspace(provider);
+  response.json({
+    data: workspace,
     provider,
     ...buildProviderContractMeta(request)
   });

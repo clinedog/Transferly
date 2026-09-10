@@ -24,6 +24,8 @@ const {
   getProviderTokensController,
   getProviderTransactionsController,
   getProviderWebhooksController,
+  getProviderWorkspaceController,
+  getProviderWalletController,
   listProviderReadinessController,
   listProviderInvoicesController,
   listProviderLanesController,
@@ -81,6 +83,8 @@ router.get('/:provider/currency-exchange', asyncHandler(getProviderCurrencyExcha
 router.get('/:provider/developer', asyncHandler(getProviderDeveloperController));
 router.get('/:provider/settings', asyncHandler(getProviderSettingsController));
 router.get('/:provider/balance', asyncHandler(getProviderBalanceController));
+router.get('/:provider/wallet', asyncHandler(getProviderWalletController));
+router.get('/:provider/workspace', asyncHandler(getProviderWorkspaceController));
 router.get('/:provider/activity', asyncHandler(getProviderActivityController));
 
 module.exports = {
