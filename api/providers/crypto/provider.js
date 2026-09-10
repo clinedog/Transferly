@@ -17,6 +17,29 @@ class CryptoCommerceProvider extends BaseProvider {
     return this.createClient().listCharges(opts);
   }
 
+  /**
+   * Returns the provider capability set.
+   * Maps to the adapter-defined capabilities for Crypto Commerce.
+   *
+   * @returns {object}
+   */
+  getCapabilities() {
+    return {
+      cardPayments: false,
+      bankTransfer: false,
+      mobileMoney: false,
+      walletPayments: false,
+      qrPayments: false,
+      payouts: false,
+      refunds: false,
+      recurringPayments: false,
+      multiCurrency: true,
+      webhooks: true,
+      supportedCountries: [],
+      supportedCurrencies: []
+    };
+  }
+
   async getHealth() {
     const cfg = this.getConfig();
     return { provider: this.id, status: cfg.configured ? 'configured' : 'needs-env', configured: cfg.configured };

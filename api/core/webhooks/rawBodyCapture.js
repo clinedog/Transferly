@@ -1,4 +1,4 @@
-const JSON_BODY_LIMIT = process.env.API_JSON_BODY_LIMIT || '12mb';
+const JSON_BODY_LIMIT = process.env.API_JSON_BODY_LIMIT || '1mb';
 
 function captureRawBody(request, _response, buffer) {
   request.rawBody = buffer.toString('utf8');

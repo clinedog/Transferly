@@ -43,6 +43,29 @@ class PayPalProvider extends BaseProvider {
   }
 
   /**
+   * Returns the provider capability set.
+   * Maps to the adapter-defined capabilities for PayPal.
+   *
+   * @returns {object}
+   */
+  getCapabilities() {
+    return {
+      cardPayments: false,
+      bankTransfer: false,
+      mobileMoney: false,
+      walletPayments: false,
+      qrPayments: false,
+      payouts: true,
+      refunds: false,
+      recurringPayments: false,
+      multiCurrency: true,
+      webhooks: true,
+      supportedCountries: [],
+      supportedCurrencies: []
+    };
+  }
+
+  /**
    * Returns a health snapshot.
    * Configured = credentials present; status reflects environment mode.
    *

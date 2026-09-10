@@ -41,11 +41,22 @@ async function getProviderBalance(input = {}) {
   const provider = String(input.provider || '').trim().toLowerCase();
   const providerStatus = paymentProviderRegistry.getProviderStatus(provider);
 
-  if (provider !== 'stripe') {
-    throw new AppError(501, 'PROVIDER_BALANCE_NOT_IMPLEMENTED', 'Provider balance retrieval is not implemented yet.', {
+  if (providerStatus.status === 'not_configured') {
+    throw new AppError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED', 'Payment provider is not configured.', {
       provider,
-      supported_providers: ['stripe']
+      missing_env: providerStatus.missing_env
     });
+  }
+
+  if (provider !== 'stripe') {
+    return {
+      provider,
+      mode: 'unknown',
+      available: [],
+      pending: [],
+      instant_available: [],
+      connect_reserved: []
+    };
   }
 
   if (providerStatus.status !== 'configured') {

@@ -1,6 +1,7 @@
 const config = require('../config');
 const { PayPalClient } = require('../adapters/paypalClient');
 const { webhookEventRepository } = require('../repositories/webhookEventRepository');
+const { paymentProviderTransactionRepository } = require('../repositories/paymentProviderTransactionRepository');
 const { auditLogService } = require('./auditLogService');
 const { paypalWebhookHandlers } = require('../webhooks/paypalWebhookHandlers');
 const { providerInvoiceWebhookHandlers } = require('../webhooks/providerInvoiceWebhookHandlers');
@@ -13,6 +14,8 @@ const {
   verifyWiseSignature
 } = require('../utils/providerWebhookSignatures');
 const { AUDIT_ACTOR_TYPE, WEBHOOK_PROCESSING_STATUS } = require('../utils/constants');
+const { normalizeProviderStatus } = require('../core/financial/reconciliation');
+const { PAYMENT_STATES, assertPaymentTransition, assertPayoutTransition } = require('../core/financial/providerStateMachine');
 
 const paypalClient = new PayPalClient(
   config.PAYPAL_CLIENT_ID,
@@ -22,6 +25,73 @@ const paypalClient = new PayPalClient(
 
 function isUniqueConstraintError(error) {
   return error?.code === 'SQLITE_CONSTRAINT' || /unique constraint/i.test(String(error?.message || ''));
+}
+
+/**
+ * Map a provider's raw status string to the canonical Transferly state machine
+ * state, and validate that the transition is legal before processing it.
+ *
+ * @param {string} transactionType 'payment' or 'payout'
+ * @param {string} currentStatus   - Current internal status (e.g. CREATED, SUCCEEDED)
+ * @param {string} providerStatus  - Raw provider status (e.g. 'SUCCESS', 'PAID')
+ * @returns {{from: string, to: string, providerStatus: string}}
+ */
+function validateStatusTransition(transactionType, currentStatus, providerStatus) {
+  const normalized = normalizeProviderStatus(providerStatus);
+  const to = normalized === 'SUCCEEDED' ? PAYMENT_STATES.SUCCEEDED : PAYMENT_STATES[normalized] || PAYMENT_STATES.UNKNOWN;
+  const from = PAYMENT_STATES[currentStatus] || PAYMENT_STATES[currentStatus];
+
+  if (transactionType === 'payout') {
+    assertPayoutTransition(from, to);
+  } else {
+    assertPaymentTransition(from, to);
+  }
+
+  return { from, to, providerStatus: normalized };
+}
+
+/**
+ * Compare a provider transaction record against a Transferly ledger entry and
+ * return a structured reconciliation result.
+ *
+ * @param {object} providerTx
+ * @param {object} ledgerEntry
+ * @returns {{status: string, discrepancies: string[], details: object}}
+ */
+function compareProviderTransaction(providerTx, ledgerEntry) {
+  const { compareTransaction } = require('../core/financial/reconciliation');
+  return compareTransaction(providerTx, ledgerEntry);
+}
+
+/**
+ * Find a Transferly ledger entry matching a provider transaction by reference.
+ *
+ * @param {string} provider
+ * @param {string} providerTransactionId
+ * @returns {Promise<object|null>}
+ */
+async function findLedgerEntryForTransaction(provider, providerTransactionId) {
+  // Fallback: use the provider transaction repository to find the matching entry
+  // by its internal reference, then resolve the ledger entry.
+  const tx = await paymentProviderTransactionRepository.findByProviderTransactionId(provider, providerTransactionId);
+  if (!tx) return null;
+
+  const reference = tx.providerReference || tx.provider_transaction_id;
+  if (!reference) return null;
+
+  // Ledger entries are stored with provider references in their metadata.
+  // Search by the reference in the metadata_json field.
+  const { db } = require('../db');
+  const rows = await db.all(
+    'SELECT * FROM ledger_entries WHERE json_extract(metadata_json, \'$.provider_reference\') = ? LIMIT 1',
+    [reference]
+  );
+  return rows[0] || null;
+}
+
+async function createReconciliationCase({ type, referenceId, providerKey, ledgerEntryId, providerTransaction, discrepancy, severity }) {
+  const { createReconciliationCase: createCase } = require('../core/financial/reconciliation');
+  return createCase({ type, referenceId, providerKey, ledgerEntryId, providerTransaction, discrepancy, severity });
 }
 
 async function createWebhookEventOnce(data) {
@@ -425,6 +495,10 @@ module.exports = {
     ingestPaystackEvent,
     ingestFlutterwaveEvent,
     ingestWiseEvent,
-    processWebhookEvent
+    processWebhookEvent,
+    validateStatusTransition,
+    compareProviderTransaction,
+    findLedgerEntryForTransaction,
+    createReconciliationCase
   }
 };

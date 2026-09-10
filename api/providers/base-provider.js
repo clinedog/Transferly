@@ -15,19 +15,22 @@
  */
 
 const { AppError } = require('../utils/errors');
+const { PaymentProvider, DEFAULT_CAPABILITIES } = require('../core/financial/providerAbstraction');
 
-class BaseProvider {
+class BaseProvider extends PaymentProvider {
   /**
    * @param {object} opts
    * @param {string} opts.id      - Provider key matching the registry key (e.g. 'paypal')
    * @param {string} opts.name    - Human-readable display name
+   * @param {number} [opts.order] - Provider priority (lower is higher priority)
    * @param {object} [opts.config]  - Optional config override (defaults to providerConfig.js)
    * @param {object} [opts.logger]  - Logger instance (defaults to console)
    */
-  constructor({ id, name, config = {}, logger = console }) {
-    if (!id || !name) throw new Error('BaseProvider requires id and name');
+  constructor({ id, name, order = 100, config = {}, logger = console }) {
+    super({ key: id, name, order });
     this.id = id;
     this.name = name;
+    this.order = order;
     this._configOverride = config;
     this.logger = logger;
   }
@@ -58,6 +61,32 @@ class BaseProvider {
   isConfigured() {
     const { isProviderConfigured } = require('./shared/providerConfig');
     return isProviderConfigured(this.id);
+  }
+
+  /**
+   * Returns structured configuration status for the provider.
+   * Combines configured state and missing environment keys for downstream consumers.
+   *
+   * @returns {{configured: boolean, provider: string, missingEnv: string[]}}
+   */
+  getConfigStatus() {
+    const cfg = this.getConfig();
+    return {
+      provider: this.id,
+      configured: Boolean(cfg.configured),
+      missingEnv: cfg.missingKeys || cfg.missing_env || []
+    };
+  }
+
+  /**
+   * Returns the provider's capability set.
+   * Concrete providers should override to declare their specific capabilities.
+   * Defaults to a permissive, multi-currency aware capability profile.
+   *
+   * @returns {object}
+   */
+  getCapabilities() {
+    return { ...DEFAULT_CAPABILITIES };
   }
 
   // ---------------------------------------------------------------------------

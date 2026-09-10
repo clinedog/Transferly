@@ -10,7 +10,72 @@ const {
 const { paymentProviderRegistry } = require('./paymentProviderRegistry');
 const { AppError } = require('../utils/errors');
 
-const OPERATION_SUPPORT = Object.freeze({
+function deriveOperationSupport() {
+  // Capability mapping: capability key -> adapter method names that determine it
+  const CAPABILITY_METHOD_MAP = {
+    invoices: ['createInvoice', 'sendInvoice', 'previewInvoice'],
+    payouts: ['createPayout', 'previewPayout'],
+    balance: ['getBalance'],
+    activity: ['listTransactions']
+  };
+
+  // Get all provider module entries (which contain both the adapter and key)
+  const { providerModuleRegistry } = require('../providers/moduleRegistry');
+  const modules = providerModuleRegistry.list({ includeDisabled: true });
+
+  // Get all provider adapter contracts
+  const adapters = modules.map((provider) => ({
+    key: provider.key,
+    adapterContract: provider.adapter.getAdapterContract()
+  }));
+
+  // Derive operation support from adapter contracts
+  const operationSupport = {
+    invoices: {},
+    payouts: {},
+    balance: {},
+    activity: {}
+  };
+
+  // For each provider, determine capability status based on adapter contract
+  adapters.forEach(({ key, adapterContract }) => {
+    Object.keys(CAPABILITY_METHOD_MAP).forEach(capability => {
+      const methodNames = CAPABILITY_METHOD_MAP[capability];
+      let status = 'unsupported'; // Start with worst case
+
+      // Check each relevant method for this capability
+      methodNames.forEach(methodName => {
+        const methodStatus = adapterContract.operations?.[methodName]?.status;
+        if (!methodStatus) return;
+
+        // Status precedence: unsupported < setup < preview < live
+        if (methodStatus === 'live') {
+          status = 'live'; // Best possible status
+        } else if (methodStatus === 'preview' && status !== 'live') {
+          status = 'preview';
+        } else if (methodStatus === 'setup' && status === 'unsupported') {
+          status = 'setup';
+        }
+        // If status is already 'live', it stays 'live'
+        // If status is 'unsupported', it stays 'unsupported' unless we find better
+      });
+
+      operationSupport[capability][key] = status;
+    });
+  });
+
+  return Object.freeze({
+    invoices: Object.freeze(operationSupport.invoices),
+    payouts: Object.freeze(operationSupport.payouts),
+    balance: Object.freeze(operationSupport.balance),
+    activity: Object.freeze(operationSupport.activity)
+  });
+}
+
+// Base enablement matrix - what Transferly has explicitly enabled for each provider.
+// This is the source of truth for what's "live" vs "preview".
+// Adapter contracts can override to 'unsupported' if the provider genuinely doesn't support it.
+const BASE_OPERATION_SUPPORT = Object.freeze({
   invoices: Object.freeze({
     paypal: 'live',
     stripe: 'live',
@@ -44,6 +109,49 @@ const OPERATION_SUPPORT = Object.freeze({
     crypto: 'live'
   })
 });
+
+function mergeOperationSupport() {
+  const derived = deriveOperationSupport();
+  const merged = {
+    invoices: {},
+    payouts: {},
+    balance: {},
+    activity: {}
+  };
+
+  // Get all provider keys from both sources
+  const allKeys = new Set([
+    ...Object.keys(derived.invoices),
+    ...Object.keys(BASE_OPERATION_SUPPORT.invoices)
+  ]);
+
+  allKeys.forEach(key => {
+    Object.keys(merged).forEach(capability => {
+      const baseStatus = BASE_OPERATION_SUPPORT[capability]?.[key];
+      const derivedStatus = derived[capability]?.[key];
+      
+      // If adapter contract says unsupported, override to unsupported
+      if (derivedStatus === 'unsupported') {
+        merged[capability][key] = 'unsupported';
+      } else if (baseStatus) {
+        // Use base status if it exists (preserves existing enablement decisions)
+        merged[capability][key] = baseStatus;
+      } else {
+        // New provider not in base matrix - use derived status
+        merged[capability][key] = derivedStatus || 'setup';
+      }
+    });
+  });
+
+  return Object.freeze({
+    invoices: Object.freeze(merged.invoices),
+    payouts: Object.freeze(merged.payouts),
+    balance: Object.freeze(merged.balance),
+    activity: Object.freeze(merged.activity)
+  });
+}
+
+const OPERATION_SUPPORT = mergeOperationSupport();
 
 const OPERATION_LABELS = Object.freeze({
   invoices: 'invoice collection',

@@ -38,6 +38,29 @@ class StripeProvider extends BaseProvider {
   }
 
   /**
+   * Returns the provider capability set.
+   * Maps to the adapter-defined capabilities for Stripe Connect.
+   *
+   * @returns {object}
+   */
+  getCapabilities() {
+    return {
+      cardPayments: true,
+      bankTransfer: false,
+      mobileMoney: false,
+      walletPayments: false,
+      qrPayments: false,
+      payouts: true,
+      refunds: true,
+      recurringPayments: false,
+      multiCurrency: true,
+      webhooks: true,
+      supportedCountries: [],
+      supportedCurrencies: []
+    };
+  }
+
+  /**
    * Returns a health snapshot.
    *
    * @returns {Promise<{status: string, provider: string, configured: boolean}>}
