@@ -25,11 +25,26 @@ const providerActivityQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(25)
 });
 
+// Provider routing query parameters accepted by GET /api/providers/routing.
+const providerRoutingQuerySchema = z
+  .object({
+    country: z.string().trim().length(2).optional(),
+    currency: z.string().trim().length(3).optional(),
+    paymentMethod: z.string().trim().min(1).max(64).optional(),
+    transactionType: z.enum(['payment', 'payout']).default('payment'),
+    preferredProvider: z.string().trim().min(1).max(64).optional(),
+    excludedProviders: z.string().trim().max(512).optional(),
+    onlyImplemented: z.coerce.boolean().default(true),
+    limit: z.coerce.number().int().positive().max(25).default(5)
+  })
+  .strict();
+
 module.exports = {
   providerActivityQuerySchema,
   providerKeySchema,
   providerLaneParamsSchema,
   providerOperationParamsSchema,
   providerOperationSchema,
-  providerParamsSchema
+  providerParamsSchema,
+  providerRoutingQuerySchema
 };

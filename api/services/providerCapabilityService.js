@@ -233,8 +233,8 @@ function describeOperationSupport(status) {
 
 function presentOperationSupport(provider) {
   return Object.fromEntries(
-    Object.entries(OPERATION_SUPPORT).map(([operation, support]) => {
-      const status = support[provider] || 'unsupported';
+    PROVIDER_OPERATION_KEYS.map((operation) => {
+      const status = OPERATION_SUPPORT[operation]?.[provider] || 'unsupported';
       const detail = describeOperationSupport(status);
 
       return [

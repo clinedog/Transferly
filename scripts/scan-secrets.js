@@ -63,7 +63,9 @@ const allowedTestLiterals = [
   'payment-matching-secret',
   'opay_webhook_secret_for_tests_123456',
   'points-funding-secret',
-  'points-reconciliation-secret'
+  'points-reconciliation-secret',
+  'jwt-secret-1234-1234-1234-1234',
+  'payout-reconciliation-secret'
 ];
 
 const patterns = [

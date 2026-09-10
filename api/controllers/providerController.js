@@ -9,7 +9,8 @@ const {
   providerActivityQuerySchema,
   providerLaneParamsSchema,
   providerOperationParamsSchema,
-  providerParamsSchema
+  providerParamsSchema,
+  providerRoutingQuerySchema
 } = require('../schemas/providerSchemas');
 const { paypalPayoutService } = require('../services/paypalPayoutService');
 const { providerActivityService } = require('../services/providerActivityService');
@@ -22,6 +23,7 @@ const { providerHealthService } = require('../services/providerHealthService');
 const { providerReadinessService } = require('../services/providerReadinessService');
 const { providerStatusService } = require('../services/providerStatusService');
 const { paypalWorkspaceService } = require('../services/paypalWorkspaceService');
+const { providerRoutingService } = require('../services/providerRoutingService');
 const { PROVIDER_CONTRACT_VERSION } = require('../constants/providerWorkspaceContract');
 const { AUDIT_ACTOR_TYPE } = require('../utils/constants');
 const { logger } = require('../utils/logger');
@@ -136,6 +138,14 @@ async function getProviderReadinessController(request, response) {
   response.json({
     data: providerReadinessService.getProviderReadiness(provider),
     provider,
+    ...buildProviderContractMeta(request)
+  });
+}
+
+async function getProviderRoutingController(request, response) {
+  const query = providerRoutingQuerySchema.parse(request.query || {});
+  response.json({
+    ...(await providerRoutingService.routeProviders(query)),
     ...buildProviderContractMeta(request)
   });
 }
@@ -464,6 +474,7 @@ module.exports = {
   getProviderOrdersController,
   getProviderPaymentsController,
   getProviderReadinessController,
+  getProviderRoutingController,
   getProviderSettingsController,
   getProviderStatusController,
   getProviderSubscriptionsController,

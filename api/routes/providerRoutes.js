@@ -17,6 +17,7 @@ const {
   getProviderOrdersController,
   getProviderPaymentsController,
   getProviderReadinessController,
+  getProviderRoutingController,
   getProviderSettingsController,
   getProviderStatusController,
   getProviderSubscriptionsController,
@@ -42,6 +43,7 @@ const router = express.Router();
 router.use(requireAuthenticatedUser);
 router.get('/', asyncHandler(listProvidersController));
 router.get('/readiness', asyncHandler(listProviderReadinessController));
+router.get('/routing', asyncHandler(getProviderRoutingController));
 router.param('provider', (request, _response, next, provider) => {
   if (config.PAYPAL_ONLY_PRODUCTION_MVP && String(provider || '').trim().toLowerCase() !== 'paypal') {
     next(new AppError(404, 'PROVIDER_COMING_SOON', 'This provider is coming soon and is not enabled for the current release.'));

@@ -39,6 +39,7 @@ function getProviderAdapterContract(providerKey) {
 function adaptToProvider(moduleEntry) {
   const adapter = moduleEntry.adapter;
   const contract = adapter.getAdapterContract();
+  const summaryCapabilities = adapter.getSummary()?.capabilities || {};
   return {
     key: moduleEntry.key,
     name: contract.display_name || moduleEntry.key,
@@ -48,13 +49,13 @@ function adaptToProvider(moduleEntry) {
     getOrder: () => moduleEntry.order || 100,
     getCapabilities: () => ({
       payouts: contract.operations?.createPayout?.status !== 'unsupported',
-      refunds: contract.operations?.createRefund?.status !== 'unsupported',
-      webhooks: Boolean(contract.capabilities?.webhooks),
-      bankTransfer: Boolean(contract.capabilities?.bank_transfer),
-      cardPayments: Boolean(contract.capabilities?.card_payments),
-      mobileMoney: Boolean(contract.capabilities?.mobile_money),
-      supportedCountries: contract.supported_countries || [],
-      supportedCurrencies: contract.supported_currencies || []
+      refunds: Boolean(summaryCapabilities.refunds),
+      webhooks: contract.operations?.verifyWebhook?.status !== 'unsupported',
+      bankTransfer: Boolean(summaryCapabilities.payouts),
+      cardPayments: Boolean(summaryCapabilities.hosted_payment_links),
+      mobileMoney: Boolean(summaryCapabilities.mobile_money),
+      supportedCountries: [],
+      supportedCurrencies: []
     })
   };
 }

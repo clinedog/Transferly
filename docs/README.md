@@ -4,6 +4,7 @@ This directory contains maintained product, architecture, operational, and contr
 
 ## Start here
 
+- [Master product vision and architecture](master-product-vision.md) — canonical product model, platform architecture, phased roadmap, and delivery gates.
 - [Next-generation enhancement strategy](next-generation-enhancement-strategy.md) — prioritized product and engineering direction.
 - [Transferly V2 implementation checklist](codex/transferly-v2-implementation-checklist.md) — implementation evidence and remaining delivery gates.
 - [Project architecture](codex/references/project-architecture.md) — package boundaries and backend layering.
