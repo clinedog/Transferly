@@ -1,22 +1,35 @@
 const {
   PROVIDER_CONTRACT_VERSION,
-  PROVIDER_OPERATION_KEYS,
-  isProviderOperationImplemented
+  PROVIDER_OPERATION_KEYS
 } = require('../constants/providerWorkspaceContract');
+const { buildProviderReadinessDescriptor, normalizeExecutionStatus } = require('../core/financial/providerContract');
 const { providerCapabilityService } = require('./providerCapabilityService');
+const { providerModuleRegistry } = require('../providers/moduleRegistry');
 
-function summarizeOperationReadiness(operations = {}) {
+function summarizeOperationReadiness(operations = {}, descriptor) {
   return PROVIDER_OPERATION_KEYS.map((operation) => {
     const support = operations[operation] || {
       status: 'unsupported',
       implemented: false
     };
 
+    // `setup` predates the canonical readiness contract. Keep it in `status`
+    // for existing consumers, while publishing its unambiguous replacement in
+    // `operation_status`. No client may infer execution from either field.
+    const operationStatus = normalizeExecutionStatus(support.status) ||
+      (support.status === 'setup' ? 'coming_soon' : 'unsupported');
+    const canonical = descriptor.operations[operation];
+
     return {
       operation,
       status: support.status,
+      operation_status: operationStatus,
       implemented: Boolean(support.implemented),
-      actionable: !isProviderOperationImplemented(support.status)
+      actionable: canonical.executionEligible.production,
+      execution_eligible: canonical.executionEligible,
+      production_enabled: canonical.productionEnabled,
+      sandbox_enabled: canonical.sandboxEnabled,
+      reason: support.reason || null
     };
   });
 }
@@ -34,7 +47,15 @@ function summarizeLaneReadiness(lanes = []) {
 }
 
 function buildReadiness(capability) {
-  const operations = summarizeOperationReadiness(capability.operations);
+  const module = providerModuleRegistry.get(capability.slug);
+  const descriptor = buildProviderReadinessDescriptor({
+    provider: capability.slug,
+    adapterContract: module.adapter.getAdapterContract(),
+    summary: module.adapter.getSummary(),
+    enabled: providerModuleRegistry.isEnabled(capability.slug),
+    operationStatuses: Object.fromEntries(Object.entries(capability.operations || {}).map(([operation, support]) => [operation, support.status]))
+  });
+  const operations = summarizeOperationReadiness(capability.operations, descriptor);
   const lanes = summarizeLaneReadiness(capability.lanes);
   const missingEnv = capability.registry_status?.missing_env || [];
   const liveOperations = operations.filter((operation) => operation.implemented);
@@ -46,7 +67,29 @@ function buildReadiness(capability) {
     contract_version: PROVIDER_CONTRACT_VERSION,
     display_name: capability.display_name,
     status: capability.status,
-    ready: missingEnv.length === 0 && liveOperations.length > 0,
+    environment: descriptor.environment,
+    enabled: descriptor.enabled,
+    production_enabled: descriptor.productionEnabled,
+    sandbox_enabled: descriptor.sandboxEnabled,
+    countries: descriptor.countries,
+    country_scope: descriptor.countryScope,
+    currencies: descriptor.currencies,
+    currency_scope: descriptor.currencyScope,
+    payment_methods: descriptor.paymentMethods,
+    limits: descriptor.limits,
+    configuration: {
+      configured: descriptor.configured,
+      required: descriptor.requiredConfiguration,
+      missing: descriptor.missingConfiguration
+    },
+    credentials: {
+      configured: descriptor.configured,
+      // Only names are exposed; neither values nor credential material leave
+      // the adapter boundary.
+      required: descriptor.requiredCredentials,
+      missing: descriptor.missingCredentials
+    },
+    ready: missingEnv.length === 0 && liveOperations.some((operation) => operation.production_enabled),
     registry_status: capability.registry_status,
     missing_env: missingEnv,
     operations,

@@ -6,6 +6,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import ServiceLogo from '../components/ServiceLogo';
 import { getRecommendedPointPacks, getServiceBySlug, getServiceEstimatedCost } from '../lib/servicesCatalog';
+import { MiniAppPageContainer, StatusBadge, SurfaceCard } from '../components/ui';
 
 const methods = [
   {
@@ -46,6 +47,7 @@ export default function BuyPointsPage() {
   const [selectedMethodId, setSelectedMethodId] = useState(methods[0].id);
   const [selectedPoints, setSelectedPoints] = useState(suggestedPacks[0] || 50);
   const [customPoints, setCustomPoints] = useState('');
+  const [fundingStep, setFundingStep] = useState(1);
   const selectedMethod = methods.find((method) => method.id === selectedMethodId) || methods[0];
   const latestOrder = topUpOrders[0] || null;
 
@@ -93,8 +95,8 @@ export default function BuyPointsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 px-4 py-5 md:px-8 md:py-8">
-        <section className="rounded-[28px] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+      <MiniAppPageContainer className="space-y-8 py-5 md:py-8">
+        <SurfaceCard>
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_340px]">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-orange-700">
@@ -118,15 +120,15 @@ export default function BuyPointsPage() {
                   { label: 'Pending orders', value: statusCounts.pending.toString() },
                   { label: 'Awaiting confirmation', value: statusCounts.awaiting.toString() }
                 ].map((item) => (
-                  <div key={item.label} className="rounded-[22px] bg-[#f8f7f3] px-4 py-4">
+                  <SurfaceCard as="div" key={item.label} className="rounded-2xl bg-[var(--miniapp-panel-bg)] px-4 py-4 shadow-none">
                     <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{item.label}</p>
                     <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{item.value}</p>
-                  </div>
+                  </SurfaceCard>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[#ece7dd] bg-[#f8f7f3] p-5">
+            <SurfaceCard as="div" className="rounded-2xl bg-[var(--miniapp-panel-bg)] p-5 shadow-none">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Funding notes</p>
               <div className="mt-5 grid gap-3 text-sm text-slate-600">
                 <div className="flex items-center gap-3">
@@ -146,13 +148,13 @@ export default function BuyPointsPage() {
               >
                 Open Telegram Vendor Chat
               </a>
-            </div>
+            </SurfaceCard>
           </div>
-        </section>
+        </SurfaceCard>
 
         {intentService ? (
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-            <div className="rounded-[26px] border border-[#ece7dd] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <section className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+            <SurfaceCard className="p-6">
               <div className="flex items-start gap-4">
                 <ServiceLogo service={intentService} size="lg" />
                 <div>
@@ -190,7 +192,7 @@ export default function BuyPointsPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </SurfaceCard>
 
             <div className="rounded-[26px] border border-[#ece7dd] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Next move</p>
@@ -245,7 +247,28 @@ export default function BuyPointsPage() {
             </div>
 
             <div className="mt-6">
-              <p className="text-sm font-black text-slate-950">Point amount</p>
+            <div aria-label="Funding steps" className="mb-5 grid grid-cols-3 gap-2">
+              {[
+                ['1', 'Choose points'],
+                ['2', 'Payment method'],
+                ['3', 'Confirm funding']
+              ].map(([number, label]) => (
+                <button
+                  key={number}
+                  type="button"
+                  onClick={() => setFundingStep(Number(number))}
+                  className={`rounded-2xl border px-3 py-3 text-left transition ${
+                    fundingStep === Number(number)
+                      ? 'border-orange-300 bg-orange-50 text-orange-800'
+                      : 'border-[#ece7dd] bg-[#f8f7f3] text-slate-500'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em]">Step {number}</span>
+                  <span className="mt-1 block text-xs font-black">{label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-sm font-black text-slate-950">Point amount</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
                 {(intentService ? suggestedPacks : [50, 100, 250, 500]).map((pack) => (
                   <button
@@ -298,6 +321,15 @@ export default function BuyPointsPage() {
                         <div className="space-y-3">
                           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm">
                             <Icon size={24} />
+                          </div>
+
+                          <div className="mt-6 rounded-2xl border border-[#ece7dd] bg-[var(--miniapp-panel-bg)] p-4">
+                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Funding value</p>
+                            <div className="mt-2 flex items-end justify-between gap-3">
+                              <p className="text-2xl font-black tracking-[-0.04em] text-slate-950">{activePoints.toLocaleString()} pts</p>
+                              <p className="text-sm font-black text-slate-600">= ₦{activePoints.toLocaleString()}</p>
+                            </div>
+                            <p className="mt-2 text-xs font-semibold text-slate-500">1 Transferly Point = ₦1. Points are confirmed only after backend verification.</p>
                           </div>
                           <div>
                             <h3 className="text-xl font-black tracking-[-0.03em] text-slate-950">{method.title}</h3>
@@ -358,6 +390,14 @@ export default function BuyPointsPage() {
                   Create Funding Order
                   <ArrowRight size={16} />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingStep((step) => Math.min(3, step + 1))}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#ece7dd] bg-[#f8f7f3] px-5 py-3 text-sm font-black text-slate-800 transition hover:border-[#f2c39a]"
+                >
+                  Continue to step {Math.min(3, fundingStep + 1)}
+                  <ArrowRight size={16} />
+                </button>
               </div>
             </div>
 
@@ -372,7 +412,7 @@ export default function BuyPointsPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>Status</span>
-                    <span className="font-black capitalize text-slate-950">{latestOrder.status.replace(/_/g, ' ')}</span>
+                    <StatusBadge status={latestOrder.status} size="sm" />
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span>Created</span>
@@ -407,7 +447,7 @@ export default function BuyPointsPage() {
             ) : null}
           </div>
         </section>
-      </div>
+      </MiniAppPageContainer>
     </DashboardLayout>
   );
 }

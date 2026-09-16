@@ -2,11 +2,11 @@ import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'reac
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   Bot,
   CheckCircle2,
   ChevronLeft,
   Copy,
-  CreditCard,
   HelpCircle,
   Home,
   Maximize2,
@@ -27,24 +27,25 @@ import toast from 'react-hot-toast';
 import { useAppContext } from '../context/AppContext';
 import { useTelegramMiniApp } from '../context/TelegramMiniAppContext';
 import AuthErrorRecoveryPanel from './AuthErrorRecoveryPanel';
+import { serviceCatalog } from '../lib/servicesCatalog';
 
 const MiniAppCommandPalette = React.lazy(() => import('./miniapp/MiniAppCommandPalette'));
 
 const railItems = [
   { label: 'Home', to: '/miniapp', icon: Home },
   { label: 'Services', to: '/miniapp/services', icon: Sparkles },
-  { label: 'Orders', to: '/miniapp/orders', icon: CreditCard },
+  { label: 'Activity', to: '/miniapp/activity', icon: Activity },
   { label: 'Wallet', to: '/miniapp/wallet', icon: WalletCards },
-  { label: 'Account', to: '/miniapp/profile', icon: Users },
+  { label: 'More', to: '/miniapp/profile', icon: Users },
   { label: 'Settings', to: '/miniapp/settings', icon: Settings }
 ];
 
 const bottomItems = [
   { label: 'Home', to: '/miniapp', icon: Home },
   { label: 'Services', to: '/miniapp/services', icon: Sparkles },
-  { label: 'Orders', to: '/miniapp/orders', icon: CreditCard },
+  { label: 'Activity', to: '/miniapp/activity', icon: Activity },
   { label: 'Wallet', to: '/miniapp/wallet', icon: WalletCards },
-  { label: 'Account', to: '/miniapp/profile', icon: Users }
+  { label: 'More', to: '/miniapp/profile', icon: Users }
 ];
 
 const COMMUNITY_MODAL_KEY = 'transferly_telegram_modal_dismissed';
@@ -135,7 +136,22 @@ export default function MiniAppShell({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, telegramAuthState, authState, lastInitializationIssue, retryInitialization } = useAppContext();
+  const {
+    user,
+    profile,
+    telegramAuthState,
+    authState,
+    lastInitializationIssue,
+    retryInitialization,
+    invoices,
+    payouts,
+    receipts,
+    topUpOrders,
+    paymentProviders,
+    organizations,
+    organizationContext,
+    switchOrganization
+  } = useAppContext();
   const telegram = useTelegramMiniApp();
   const { configureBackButton, configureSettingsButton, impact } = telegram;
   const viewport = telegram.viewport || {};
@@ -164,6 +180,7 @@ export default function MiniAppShell({
   const currentScreen = isRoot ? 'home' : location.pathname.replace('/miniapp/', '') || 'home';
   const settingsPath = `/miniapp/settings?from=${encodeURIComponent(currentScreen)}`;
   const lightMode = themeMode === 'light';
+  const activeOrganizationId = organizationContext?.organization?.id || organizations?.[0]?.id || '';
   const shellClassName = `transferly-miniapp-skin ${lightMode ? 'transferly-miniapp-skin-light' : ''}`;
   const showCustomBackControl = isRoot || !hasTelegramLaunch(telegram);
 
@@ -379,6 +396,9 @@ export default function MiniAppShell({
       style={shellStyle}
     >
       <div className="miniapp-shell-frame flex w-full">
+        <a href="#miniapp-main-content" className="miniapp-skip-link">
+          Skip to main content
+        </a>
         <aside className="miniapp-elevated-surface sticky top-0 hidden h-[var(--tg-viewport-stable-height)] w-[86px] shrink-0 flex-col items-center border-r border-[var(--miniapp-border-color)] bg-[var(--miniapp-shell-bg)] px-3 py-4 backdrop-blur-2xl md:flex">
           <Link
             to="/miniapp"
@@ -404,7 +424,10 @@ export default function MiniAppShell({
         </aside>
 
         <div className="miniapp-shell-main flex min-w-0 flex-1 flex-col">
-          <header className="miniapp-shell-header sticky top-0 z-30 border-b border-[var(--miniapp-border-color)] bg-[var(--miniapp-header-bg)] px-4 pb-3 shadow-[0_12px_44px_rgba(0,0,0,0.12)] backdrop-blur-2xl md:px-6">
+          <header
+            className="miniapp-shell-header sticky top-0 z-30 border-b border-[var(--miniapp-border-color)] bg-[var(--miniapp-header-bg)] px-4 pb-3 shadow-[0_12px_44px_rgba(0,0,0,0.12)] backdrop-blur-2xl md:px-6"
+            aria-label="Transferly workspace header"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 {showCustomBackControl ? (
@@ -469,6 +492,28 @@ export default function MiniAppShell({
                     <span className="block text-[11px] font-black text-[var(--miniapp-shell-text-muted)]">{points.toLocaleString()}pts</span>
                   </span>
                 </Link>
+                {organizations?.length > 1 ? (
+                  <label className="sr-only" htmlFor="miniapp-organization-switcher">Switch organization</label>
+                ) : null}
+                {organizations?.length > 1 ? (
+                  <select
+                    id="miniapp-organization-switcher"
+                    value={activeOrganizationId}
+                    onChange={(event) => {
+                      switchOrganization(event.target.value).catch((error) => {
+                        console.error('Failed to switch organization', error);
+                      });
+                    }}
+                    className="miniapp-pressable max-w-[180px] rounded-full border border-[var(--miniapp-border-color)] bg-[var(--miniapp-panel-bg)] px-3 py-2 text-xs font-black text-[var(--miniapp-shell-text)]"
+                    aria-label="Switch organization"
+                  >
+                    {organizations.map((organization) => (
+                      <option key={organization.id} value={organization.id}>
+                        {organization.name} · {organization.role}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
                 {renderFullscreenButton()}
                 <button
                   type="button"
@@ -521,8 +566,10 @@ export default function MiniAppShell({
           </header>
 
           <main
+            id="miniapp-main-content"
             className="miniapp-shell-content mx-auto w-full max-w-[1100px] flex-1 px-4 py-4 md:px-6 md:py-6"
             data-testid="miniapp-shell-content"
+            tabIndex="-1"
           >
             {children}
           </main>
@@ -550,6 +597,12 @@ export default function MiniAppShell({
               open={commandPaletteOpen}
               onClose={closeCommandPalette}
               onCommand={handleCommandSelected}
+              invoices={invoices}
+              payouts={payouts}
+              receipts={receipts}
+              topUpOrders={topUpOrders}
+              paymentProviders={paymentProviders}
+              services={serviceCatalog}
             />
           </Suspense>
 

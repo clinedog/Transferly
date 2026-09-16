@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import { useAppContext } from '../context/AppContext';
 import { useTelegramMiniApp } from '../context/TelegramMiniAppContext';
 import MiniAppOperationStatus from './MiniAppOperationStatus';
+import { SurfaceCard } from './ui';
 
 function formatMinor(amountMinor, currency = 'NGN') {
   const major = Number(amountMinor || 0) / 100;
@@ -438,7 +439,7 @@ function WalletReadiness({ authenticated, selectedPackage, paymentDestination })
   ];
 
   return (
-    <section aria-label="Point order readiness" className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+    <SurfaceCard as="section" aria-label="Point order readiness" className="p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Order readiness</p>
@@ -448,7 +449,7 @@ function WalletReadiness({ authenticated, selectedPackage, paymentDestination })
       </div>
       <div className="mt-5 grid gap-2 sm:grid-cols-4">
         {items.map((item) => (
-          <div key={item.label} className="rounded-[20px] bg-[var(--tg-secondary-bg-color)] p-3">
+          <SurfaceCard as="div" key={item.label} className="rounded-2xl bg-[var(--tg-secondary-bg-color)] p-3 shadow-none">
             {item.complete ? (
               <CheckCircle2 className="text-[var(--tg-button-color)]" size={18} />
             ) : (
@@ -456,10 +457,10 @@ function WalletReadiness({ authenticated, selectedPackage, paymentDestination })
             )}
             <p className="mt-3 text-sm font-black text-[var(--tg-text-color)]">{item.label}</p>
             <p className="mt-1 text-xs font-bold text-[var(--tg-subtitle-text-color)]">{item.detail}</p>
-          </div>
+          </SurfaceCard>
         ))}
       </div>
-    </section>
+    </SurfaceCard>
   );
 }
 

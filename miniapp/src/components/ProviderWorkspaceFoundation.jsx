@@ -6,7 +6,7 @@ import {
   getProviderManifest,
   isProviderLaneSupported
 } from '../lib/providerManifests';
-import { PROVIDER_CONTRACT_VERSION } from '../lib/providerWorkspaceContract';
+import { PROVIDER_CONTRACT_VERSION, mergeProviderManifestCapability } from '../lib/providerWorkspaceContract';
 import PayPalProviderWorkspace from './PayPalProviderWorkspace';
 import ProviderWorkspaceShell from './ProviderWorkspaceShell';
 import ProviderWorkspaceLayout from './providers/ProviderWorkspaceLayout';
@@ -142,29 +142,32 @@ export default function ProviderWorkspaceFoundation({ slug, lane = 'overview' })
   const {
     paymentProviders = [],
     providerHealth = [],
-    providerBalances = {}
+    providerBalances = {}, providerCapabilities = [], providerCapabilitiesLoaded = false
   } = useAppContext();
 
+  const runtimeCapability = providerCapabilitiesLoaded ? providerCapabilities.find((capability) => readProviderSlug(capability) === manifest?.slug) : null;
+  const effectiveManifest = mergeProviderManifestCapability(manifest, runtimeCapability);
+
   const workspaceData = useMemo(() => {
-    if (!manifest) {
+    if (!effectiveManifest) {
       return null;
     }
 
-    const providerRecord = paymentProviders.find((provider) => readProviderSlug(provider) === manifest.slug) || null;
-    const health = providerHealth.find((item) => readHealthSlug(item) === manifest.slug) || null;
+    const providerRecord = paymentProviders.find((provider) => readProviderSlug(provider) === effectiveManifest.slug) || null;
+    const health = providerHealth.find((item) => readHealthSlug(item) === effectiveManifest.slug) || null;
 
     return {
       providerRecord,
       health,
-      balance: providerBalances[manifest.slug] || null,
-      environment: formatEnvironment(manifest, providerRecord),
-      connectionStatus: readConnectionStatus(manifest, providerRecord, health)
+      balance: providerBalances[effectiveManifest.slug] || null,
+      environment: formatEnvironment(effectiveManifest, providerRecord),
+      connectionStatus: readConnectionStatus(effectiveManifest, providerRecord, health)
     };
-  }, [manifest, paymentProviders, providerBalances, providerHealth]);
+  }, [effectiveManifest, paymentProviders, providerBalances, providerHealth]);
 
-  const dashboardSnapshot = useProviderDashboardSnapshot(manifest?.slug && manifest.slug !== 'paypal' ? manifest.slug : '');
+  const dashboardSnapshot = useProviderDashboardSnapshot(effectiveManifest?.slug && effectiveManifest.slug !== 'paypal' ? effectiveManifest.slug : '');
 
-  if (!manifest) {
+  if (!effectiveManifest) {
     return (
       <ProviderWorkspaceShell
         state="error"
@@ -177,33 +180,33 @@ export default function ProviderWorkspaceFoundation({ slug, lane = 'overview' })
     return (
       <ProviderWorkspaceShell
         state="error"
-        error={`${manifest.displayName} is not enabled for this Transferly workspace.`}
+        error={`${effectiveManifest.displayName} is not enabled for this Transferly workspace.`}
       />
     );
   }
 
-  if (manifest.slug === 'paypal') {
+  if (effectiveManifest.slug === 'paypal') {
     return <PayPalProviderWorkspace lane={lane} />;
   }
 
   const requestedLane = lane || 'overview';
-  const activeLane = isProviderLaneSupported(manifest.slug, requestedLane) ? requestedLane : 'overview';
+  const activeLane = isProviderLaneSupported(effectiveManifest.slug, requestedLane) ? requestedLane : 'overview';
   const unsupportedLane = requestedLane !== activeLane;
 
   return (
     <ProviderWorkspaceShell
-      manifest={manifest}
+      manifest={effectiveManifest}
       activeLane={activeLane}
-      lanes={manifest.lanes}
+      lanes={effectiveManifest.lanes}
       environment={workspaceData?.environment}
       connectionStatus={workspaceData?.connectionStatus}
-      capabilities={manifest.capabilities}
+      capabilities={effectiveManifest.capabilities}
       quickActions={[]}
       state={unsupportedLane ? 'error' : 'ready'}
-      error={`${manifest.displayName} does not support the ${requestedLane} lane in Transferly yet.`}
+      error={`${effectiveManifest.displayName} does not support the ${requestedLane} lane in Transferly yet.`}
     >
       <ProviderWorkspaceLayout
-        manifest={manifest}
+        manifest={effectiveManifest}
         activeLane={activeLane}
         requestedLane={requestedLane}
         unsupportedLane={unsupportedLane}

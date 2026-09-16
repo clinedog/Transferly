@@ -1,17 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Clock3, Search, Wallet, XCircle } from 'lucide-react';
+import { ArrowRight, Search, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import { getServiceBySlug } from '../lib/servicesCatalog';
-
-const statusMeta = {
-  pending: { label: 'Pending', icon: Clock3, color: '#f59e0b' },
-  awaiting_confirmation: { label: 'Awaiting confirmation', icon: Clock3, color: '#0ea5e9' },
-  completed: { label: 'Completed', icon: CheckCircle2, color: '#10b981' },
-  cancelled: { label: 'Cancelled', icon: XCircle, color: '#ef4444' }
-};
+import { MiniAppPageContainer, SurfaceCard, StatusBadge } from '../components/ui';
 
 export default function OrdersPage() {
   const { config, topUpOrders, updateTopUpOrderStatus } = useAppContext();
@@ -66,8 +60,8 @@ export default function OrdersPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 px-4 py-5 md:px-8 md:py-8">
-        <section className="rounded-[8px] bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.05)]">
+      <MiniAppPageContainer className="space-y-6 py-5 md:py-8">
+        <SurfaceCard className="p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -96,15 +90,15 @@ export default function OrdersPage() {
               { label: 'Awaiting', value: counts.awaiting },
               { label: 'Completed', value: counts.completed }
             ].map((stat) => (
-              <div key={stat.label} className="rounded-[8px] bg-[#f8f7f3] px-4 py-4">
+              <SurfaceCard as="div" key={stat.label} className="rounded-2xl bg-[var(--miniapp-panel-bg)] px-4 py-4 shadow-none">
                 <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{stat.label}</p>
                 <p className="mt-2 text-2xl font-black text-slate-950">{stat.value}</p>
-              </div>
+              </SurfaceCard>
             ))}
           </div>
-        </section>
+        </SurfaceCard>
 
-        <section className="rounded-[8px] border border-[#e9e0d2] bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.04)]">
+        <SurfaceCard className="p-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-slate-700">Search orders</span>
@@ -133,33 +127,25 @@ export default function OrdersPage() {
               </select>
             </label>
           </div>
-        </section>
+        </SurfaceCard>
 
         <section className="space-y-4">
           {filteredOrders.length === 0 ? (
-            <div className="rounded-[8px] border border-dashed border-[#e1d7c8] bg-white px-6 py-14 text-center">
+            <SurfaceCard className="border-dashed px-6 py-14 text-center">
               <Wallet size={48} className="mx-auto text-slate-300" />
               <h2 className="mt-4 text-2xl font-black text-slate-950">No orders found</h2>
               <p className="mt-2 text-sm text-slate-600">Create a funding order from the Buy Points page.</p>
-            </div>
+            </SurfaceCard>
           ) : (
             filteredOrders.map((order) => {
-              const meta = statusMeta[order.status] || statusMeta.pending;
-              const Icon = meta.icon;
               const service = getServiceBySlug(order.service_intent || '');
 
               return (
-                <article key={order.order_id} className="rounded-[8px] border border-[#e9e0d2] bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.04)]">
+                <SurfaceCard as="article" key={order.order_id} className="p-5">
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em]"
-                          style={{ backgroundColor: `${meta.color}18`, color: meta.color }}
-                        >
-                          <Icon size={13} />
-                          {meta.label}
-                        </span>
+                        <StatusBadge status={order.status} />
                         {service ? (
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
                             {service.title}
@@ -213,12 +199,12 @@ export default function OrdersPage() {
                       </Link>
                     </div>
                   </div>
-                </article>
+                </SurfaceCard>
               );
             })
           )}
         </section>
-      </div>
+      </MiniAppPageContainer>
     </DashboardLayout>
   );
 }

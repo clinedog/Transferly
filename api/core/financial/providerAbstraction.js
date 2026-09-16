@@ -4,7 +4,7 @@ const { AppError } = require('../../utils/errors');
 
 class PaymentProvider {
   constructor({ key, name, order = 100 }) {
-    if (!key || !name) throw new Error('PaymentProvider requires key and name');
+    if (!key || !name) throw new Error('PaymentProvider requires id and name');
     this.key = key;
     this.name = name;
     this.order = order;

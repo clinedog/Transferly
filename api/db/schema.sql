@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 
 CREATE TABLE IF NOT EXISTS wallets (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL UNIQUE,
+  user_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'personal',
   currency_code TEXT NOT NULL,
   pending_balance_cents INTEGER NOT NULL DEFAULT 0,
   available_balance_cents INTEGER NOT NULL DEFAULT 0,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS wallets (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (user_id, organization_id),
   CHECK (pending_balance_cents >= 0),
   CHECK (available_balance_cents >= 0),
   CHECK (frozen_balance_cents >= 0),
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
   entry_key TEXT NOT NULL UNIQUE,
   wallet_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'personal',
   type TEXT NOT NULL,
   debit_bucket TEXT,
   credit_bucket TEXT,
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
 CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'personal',
   template_id TEXT,
   paypal_invoice_id TEXT NOT NULL UNIQUE,
   invoice_number TEXT NOT NULL,
@@ -201,6 +205,7 @@ CREATE TABLE IF NOT EXISTS stripe_connected_accounts (
 CREATE TABLE IF NOT EXISTS payouts (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'personal',
   payout_batch_id TEXT,
   idempotency_key TEXT NOT NULL UNIQUE,
   sender_batch_id TEXT NOT NULL UNIQUE,

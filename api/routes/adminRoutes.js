@@ -24,6 +24,7 @@ const {
   deleteAdminInvoiceTemplateController,
   deleteAdminTestimonialController,
   getAdminFinanceOverviewController,
+  listAdminAuditLogsController,
   getAdminFundingEvidenceController,
   getAdminFundingRequestController,
   getAdminUserFinanceProfileController,
@@ -52,6 +53,16 @@ const {
   listPaymentOpsIssuesController,
   listPaymentProviderHealthController,
   listPaymentProviderReadinessController,
+  getProductionReadinessController,
+  listProviderIncidentsController,
+  transitionProviderIncidentController,
+  listAutomationHistoryController,
+  listAutomationRulesController,
+  createAutomationRuleController,
+  updateAutomationRuleStatusController,
+  dryRunAutomationRuleController,
+  listAutomationExecutionsController,
+  getSecurityOverviewController,
   listPaymentProviderInvoiceFeaturesController,
   listPaymentProvidersController,
   listStripeConnectedAccountsController,
@@ -97,6 +108,7 @@ const router = express.Router();
 
 router.get('/users', requireAdminActor, asyncHandler(listAdminUsersController));
 router.get('/finance/overview', requireAdminActor, asyncHandler(getAdminFinanceOverviewController));
+router.get('/audit-logs', requireAdminActor, asyncHandler(listAdminAuditLogsController));
 router.get('/finance/transactions', requireAdminActor, asyncHandler(listAdminFinanceTransactionsController));
 router.get('/finance/reconciliation-alerts', requireAdminActor, asyncHandler(listAdminFinanceReconciliationAlertsController));
 router.get('/finance/users/:id', requireAdminActor, asyncHandler(getAdminUserFinanceProfileController));
@@ -174,6 +186,16 @@ router.get(
 );
 router.get('/payment-providers/health', requireAdminActor, asyncHandler(listPaymentProviderHealthController));
 router.get('/payment-providers/readiness', requireAdminActor, asyncHandler(listPaymentProviderReadinessController));
+router.get('/production-readiness', requireAdminActor, asyncHandler(getProductionReadinessController));
+router.get('/provider-incidents', requireAdminActor, asyncHandler(listProviderIncidentsController));
+router.patch('/provider-incidents/:id', requireAdminActor, asyncHandler(transitionProviderIncidentController));
+router.get('/automation-history', requireAdminActor, asyncHandler(listAutomationHistoryController));
+router.get('/automation-rules', requireAdminActor, asyncHandler(listAutomationRulesController));
+router.post('/automation-rules', requireAdminActor, asyncHandler(createAutomationRuleController));
+router.patch('/automation-rules/:id/status', requireAdminActor, asyncHandler(updateAutomationRuleStatusController));
+router.post('/automation-rules/:id/dry-run', requireAdminActor, asyncHandler(dryRunAutomationRuleController));
+router.get('/automation-executions', requireAdminActor, asyncHandler(listAutomationExecutionsController));
+router.get('/security-overview', requireAdminActor, asyncHandler(getSecurityOverviewController));
 router.get(
   '/payment-providers/:provider/invoice-features',
   requireAdminActor,

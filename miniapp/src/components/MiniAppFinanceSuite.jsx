@@ -33,7 +33,16 @@ import {
 import toast from 'react-hot-toast';
 import { useAppContext } from '../context/AppContext';
 import { useTelegramMiniApp } from '../context/TelegramMiniAppContext';
-import { PremiumInput } from './ui';
+import { PremiumInput, SurfaceCard } from './ui';
+import OrganizationTeamSection from './OrganizationTeamSection';
+import {
+  createMyApiKey,
+  listMyApiKeys,
+  listMySessions,
+  revokeMyApiKey,
+  revokeMySession,
+  rotateMyApiKey
+} from '../lib/api';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -49,12 +58,19 @@ const statusTone = {
   PROCESSING: 'info',
   PENDING: 'warn',
   PENDING_APPROVAL: 'warn',
+  RISK_CHECK: 'warn',
+  AUTO_APPROVED: 'success',
+  RESERVED: 'info',
+  SUBMITTED: 'info',
   AWAITING_CONFIRMATION: 'warn',
   FAILED: 'danger',
   CANCELLED: 'danger',
   REJECTED: 'danger',
   DISPUTED: 'danger',
-  HOLD: 'danger'
+  HOLD: 'danger',
+  UNKNOWN: 'unknown',
+  RECONCILING: 'unknown',
+  RECONCILIATION: 'unknown'
 };
 
 function formatMoney(value, currency = 'USD') {
@@ -210,7 +226,8 @@ function toneClass(tone = 'default') {
     success: 'bg-emerald-50 text-emerald-700',
     info: 'bg-sky-50 text-sky-700',
     warn: 'bg-amber-50 text-amber-700',
-    danger: 'bg-rose-50 text-rose-700'
+    danger: 'bg-rose-50 text-rose-700',
+    unknown: 'bg-slate-100 text-slate-700'
   };
 
   return classes[tone] || classes.default;
@@ -222,14 +239,14 @@ function StatusBadge({ status }) {
 
   return (
     <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${toneClass(tone)}`}>
-      {normalizeStatus(upper)}
+      {upper === 'UNKNOWN' || upper === 'RECONCILING' ? 'Reconciling' : normalizeStatus(upper)}
     </span>
   );
 }
 
 function SuiteHeader({ eyebrow, title, body, icon: Icon, action }) {
   return (
-    <section className="miniapp-enter overflow-hidden rounded-[30px] bg-[var(--tg-section-bg-color)] shadow-[0_22px_70px_rgba(15,23,42,0.12)]">
+    <SurfaceCard className="miniapp-enter" aria-label={title}>
       <div className="relative p-5 sm:p-6">
         <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[42px] bg-[color-mix(in_srgb,var(--tg-button-color)_12%,transparent)]" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -246,13 +263,13 @@ function SuiteHeader({ eyebrow, title, body, icon: Icon, action }) {
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       </div>
-    </section>
+    </SurfaceCard>
   );
 }
 
 function MetricCard({ icon: Icon, label, value, detail, tone = 'default' }) {
   return (
-    <div className={`rounded-[26px] p-4 shadow-sm ${tone === 'default' ? 'bg-[var(--tg-section-bg-color)]' : toneClass(tone)}`}>
+    <SurfaceCard className={`p-4 ${tone === 'default' ? '' : toneClass(tone)}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">
           <Icon size={15} />
@@ -261,13 +278,13 @@ function MetricCard({ icon: Icon, label, value, detail, tone = 'default' }) {
       </div>
       <p className="mt-3 text-2xl font-black tracking-[-0.045em] text-[var(--tg-text-color)]">{value}</p>
       {detail ? <p className="mt-2 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">{detail}</p> : null}
-    </div>
+    </SurfaceCard>
   );
 }
 
 function SearchBar({ query, onQuery, placeholder = 'Search records' }) {
   return (
-    <div className="flex items-center gap-3 rounded-[22px] bg-[var(--tg-section-bg-color)] px-4 py-3 shadow-sm">
+    <SurfaceCard as="div" className="flex items-center gap-3 px-4 py-3">
       <Search size={18} className="text-[var(--tg-hint-color)]" />
       <input
         value={query}
@@ -276,20 +293,20 @@ function SearchBar({ query, onQuery, placeholder = 'Search records' }) {
         className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--tg-text-color)] outline-none placeholder:text-[var(--tg-hint-color)]"
       />
       <SlidersHorizontal size={18} className="text-[var(--tg-hint-color)]" />
-    </div>
+    </SurfaceCard>
   );
 }
 
 function EmptyState({ icon: Icon, title, body, action }) {
   return (
-    <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-6 text-center shadow-sm">
+    <SurfaceCard className="p-6 text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-[var(--tg-secondary-bg-color)] text-[var(--tg-button-color)]">
         <Icon size={28} />
       </div>
       <h3 className="mt-5 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[var(--tg-subtitle-text-color)]">{body}</p>
       {action ? <div className="mt-5">{action}</div> : null}
-    </section>
+    </SurfaceCard>
   );
 }
 
@@ -348,23 +365,40 @@ function Timeline({ events }) {
         const Icon = event.icon;
 
         return (
-          <div key={`${event.title}-${index}`} className="flex gap-3">
+          <button type="button" onClick={event.onSelect} key={`${event.title}-${index}`} className="flex w-full gap-3 text-left">
             <div className="flex flex-col items-center">
               <span className={`flex h-9 w-9 items-center justify-center rounded-full ${toneClass(event.tone || 'default')}`}>
                 <Icon size={16} />
               </span>
               {index < events.length - 1 ? <span className="mt-2 h-9 w-px bg-black/10" /> : null}
             </div>
-            <div className="min-w-0 flex-1 rounded-[22px] bg-[var(--tg-secondary-bg-color)] p-4">
+            <SurfaceCard as="div" className="min-w-0 flex-1 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-black text-[var(--tg-text-color)]">{event.title}</p>
                   <p className="mt-1 text-xs font-bold leading-5 text-[var(--tg-subtitle-text-color)]">{event.body}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {event.provider ? (
+                      <span className="rounded-full bg-[var(--tg-section-bg-color)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--tg-hint-color)]">
+                        {event.provider}
+                      </span>
+                    ) : null}
+                    {event.status ? (
+                      <span className="rounded-full bg-[var(--tg-section-bg-color)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--tg-hint-color)]">
+                        {event.status === 'UNKNOWN' || event.status === 'RECONCILING' ? 'Reconciling' : normalizeStatus(event.status)}
+                      </span>
+                    ) : null}
+                    {event.currency && event.amount !== null && event.amount !== undefined ? (
+                      <span className="rounded-full bg-[var(--tg-section-bg-color)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--tg-hint-color)]">
+                        {formatMoney(event.amount, event.currency)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">{event.time}</span>
               </div>
-            </div>
-          </div>
+            </SurfaceCard>
+          </button>
         );
       })}
     </div>
@@ -409,7 +443,7 @@ const transactionSummaryGroups = [
   },
   {
     label: 'In motion',
-    statuses: ['SENT', 'PROCESSING', 'PENDING', 'PENDING_APPROVAL', 'AWAITING_CONFIRMATION'],
+    statuses: ['SENT', 'PROCESSING', 'PENDING', 'PENDING_APPROVAL', 'RISK_CHECK', 'RESERVED', 'SUBMITTED', 'AWAITING_CONFIRMATION'],
     tone: 'warn',
     icon: Clock3
   },
@@ -417,6 +451,12 @@ const transactionSummaryGroups = [
     label: 'Needs action',
     statuses: ['FAILED', 'CANCELLED', 'REJECTED', 'DISPUTED', 'HOLD'],
     tone: 'danger',
+    icon: AlertTriangle
+  },
+  {
+    label: 'Reconciliation',
+    statuses: ['UNKNOWN', 'RECONCILING', 'RECONCILIATION'],
+    tone: 'unknown',
     icon: AlertTriangle
   }
 ];
@@ -527,8 +567,32 @@ function buildPayoutRows(payout) {
     ['Receiver', readPayoutReceiver(payout)],
     ['Provider', payout?.metadata?.provider || payout?.provider || 'PayPal'],
     ['Payout ID', readPayoutId(payout)],
+    ['Risk decision', normalizeStatus(payout?.risk_decision || payout?.riskDecision || 'unknown')],
     ['Updated', formatDate(readPayoutUpdatedAt(payout))]
   ];
+}
+
+function payoutLifecycle(payout) {
+  const status = String(payout?.status || '').toUpperCase();
+  const riskDecision = String(payout?.risk_decision || payout?.riskDecision || '').toUpperCase();
+  if (['UNKNOWN', 'RECONCILING', 'RECONCILIATION_REQUIRED'].includes(status)) return { status: 'RECONCILIATION', next: 'Wait for reconciliation before retrying.' };
+  if (['FAILED', 'DENIED', 'REJECTED', 'CANCELLED'].includes(status)) return { status, next: 'Review the failure reason before creating a new request.' };
+  if (['SUCCESS', 'SUCCEEDED', 'COMPLETED'].includes(status)) return { status: 'SUCCEEDED', next: 'No action required.' };
+  if (['PROCESSING', 'QUEUED'].includes(status)) return { status: 'PROCESSING', next: 'Provider processing is in flight.' };
+  if (['SUBMITTED', 'SENT'].includes(status)) return { status: 'SUBMITTED', next: 'Provider has accepted the request.' };
+  if (status === 'PENDING_APPROVAL' || riskDecision === 'REVIEW' || riskDecision === 'MANUAL_REVIEW') return { status: 'RISK_CHECK', next: 'Manual review is required before funds are released.' };
+  if (['APPROVED', 'AUTO_APPROVED'].includes(status) || riskDecision === 'AUTO_APPROVED') return { status: 'AUTO_APPROVED', next: 'Eligible for reservation and processing.' };
+  if (status === 'RESERVED') return { status: 'RESERVED', next: 'Funds are reserved while processing continues.' };
+  return { status: status || 'REQUESTED', next: 'Eligibility and risk checks are being evaluated.' };
+}
+
+function invoiceLifecycle(invoice) {
+  const status = String(invoice?.status || '').toUpperCase();
+  if (['UNKNOWN', 'RECONCILING', 'RECONCILIATION_REQUIRED'].includes(status)) return { status: 'RECONCILIATION', next: 'Provider payment state requires reconciliation.' };
+  if (['PAID', 'COMPLETED', 'SUCCEEDED'].includes(status)) return { status: 'SUCCEEDED', next: 'Payment confirmed by the provider.' };
+  if (['FAILED', 'DISPUTED', 'CANCELLED', 'REJECTED'].includes(status)) return { status, next: 'Review the provider outcome before changing collection settings.' };
+  if (['VIEWED', 'SENT', 'PENDING'].includes(status)) return { status, next: 'Awaiting customer payment or provider confirmation.' };
+  return { status: status || 'DRAFT', next: 'Invoice is being prepared.' };
 }
 
 const providerLabels = {
@@ -1214,6 +1278,7 @@ function PayoutReadinessGuide({ records, profile }) {
   const availableBalance = readWalletAmount(profile, 'available_balance');
   const reviewCount = records.filter((record) => String(record.status).toUpperCase() === 'PENDING_APPROVAL').length;
   const processingCount = records.filter((record) => String(record.status).toUpperCase() === 'PROCESSING').length;
+  const reconciliationCount = records.filter((record) => ['UNKNOWN', 'RECONCILING', 'RECONCILIATION_REQUIRED'].includes(String(record.status).toUpperCase())).length;
   const exceptionCount = records.filter((record) => ['FAILED', 'CANCELLED', 'REJECTED', 'HOLD'].includes(String(record.status).toUpperCase())).length;
   const items = [
     {
@@ -1239,6 +1304,12 @@ function PayoutReadinessGuide({ records, profile }) {
       value: exceptionCount.toLocaleString(),
       detail: 'Needs retry or cancel',
       icon: AlertTriangle
+    },
+    {
+      label: 'Reconciliation',
+      value: reconciliationCount.toLocaleString(),
+      detail: 'Do not retry blindly',
+      icon: ShieldAlert
     }
   ];
 
@@ -1251,7 +1322,7 @@ function PayoutReadinessGuide({ records, profile }) {
         </div>
         <ShieldAlert className="shrink-0 text-[var(--tg-button-color)]" size={26} />
       </div>
-      <div className="mt-5 grid gap-2 sm:grid-cols-4">
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {items.map((item) => {
           const Icon = item.icon;
 
@@ -1443,6 +1514,16 @@ export function InvoicesSection() {
         <MetricCard icon={Clock3} label="Open" value={records.filter((record) => ['SENT', 'PENDING'].includes(String(record.status).toUpperCase())).length.toLocaleString()} />
         <MetricCard icon={AlertTriangle} label="Attention" value={records.filter((record) => ['FAILED', 'DISPUTED', 'CANCELLED'].includes(String(record.status).toUpperCase())).length.toLocaleString()} />
       </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          ['Draft', ['DRAFT']],
+          ['Viewed', ['VIEWED']],
+          ['Partially paid', ['PARTIALLY_PAID', 'PARTIALLY PAID']],
+          ['Overdue', ['OVERDUE']]
+        ].map(([label, statuses]) => (
+          <MetricCard key={label} icon={FileText} label={label} value={records.filter((record) => statuses.includes(String(record.status || '').toUpperCase())).length.toLocaleString()} detail="Provider-reported state" />
+        ))}
+      </div>
       <TransactionStatusSummary title="Invoice workflow summary" records={records} emptyLabel="No invoices" />
       <SearchBar query={query} onQuery={setQuery} placeholder="Search invoices, clients, status" />
       {filtered.length ? (
@@ -1467,7 +1548,7 @@ export function InvoicesSection() {
           <RecordDetailPanel
             title={readInvoiceDescription(selected)}
             amount={formatMoney(readAmount(selected), readCurrency(selected))}
-            status={selected?.status}
+            status={invoiceLifecycle(selected).status}
             rows={buildInvoiceRows(selected)}
             action={
               <>
@@ -1479,7 +1560,7 @@ export function InvoicesSection() {
             events={[
               { icon: FileText, title: 'Invoice created', body: 'Ledger intent and invoice details were prepared.', time: formatDate(readInvoiceCreatedAt(selected)), tone: 'info' },
               { icon: Mail, title: 'Client delivery', body: 'Payment link is ready for client handoff and reminders.', time: 'live', tone: 'warn' },
-              { icon: BadgeCheck, title: 'Collection state', body: `Current provider state is ${normalizeStatus(selected?.status)}.`, time: 'now', tone: statusTone[String(selected?.status || '').toUpperCase()] || 'default' }
+              { icon: BadgeCheck, title: 'Collection state', body: `${normalizeStatus(selected?.status)}. ${invoiceLifecycle(selected).next}`, time: 'now', tone: statusTone[String(selected?.status || '').toUpperCase()] || 'default' }
             ]}
           />
         </div>
@@ -1571,8 +1652,8 @@ export function PayoutsSection() {
               </>
             }
             events={[
-              { icon: ShieldCheck, title: 'Eligibility checked', body: 'Balance, account, and hold rules were evaluated.', time: 'now', tone: 'success' },
-              { icon: Clock3, title: 'Approval queue', body: 'High-risk or large transfers wait for operator review.', time: 'live', tone: 'warn' },
+              { icon: ShieldCheck, title: 'Lifecycle state', body: `${normalizeStatus(payoutLifecycle(selected).status)}. ${payoutLifecycle(selected).next}`, time: formatDate(readPayoutUpdatedAt(selected)), tone: statusTone[payoutLifecycle(selected).status] || 'warn' },
+              { icon: Clock3, title: 'Retry safety', body: ['RECONCILIATION', 'UNKNOWN'].includes(payoutLifecycle(selected).status) ? 'Do not submit a duplicate retry until the provider outcome is reconciled.' : 'Idempotency protects repeated submissions for this request.', time: 'policy', tone: 'warn' },
               { icon: WalletCards, title: 'Provider state', body: `Current payout state is ${normalizeStatus(selected?.status)}.`, time: formatDate(readPayoutUpdatedAt(selected)), tone: statusTone[String(selected?.status || '').toUpperCase()] || 'default' }
             ]}
           />
@@ -1589,8 +1670,29 @@ export function PayoutsSection() {
 }
 
 function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues }) {
+  const operationCategory = (record, fallback) => {
+    const operation = String(
+      record?.operation ||
+      record?.operation_type ||
+      record?.type ||
+      record?.kind ||
+      record?.resource_type ||
+      ''
+    ).toLowerCase();
+
+    if (operation.includes('refund')) return 'refunds';
+    if (operation.includes('transfer')) return 'transfers';
+    return fallback;
+  };
+
   return [
     ...invoices.map((invoice) => ({
+      category: operationCategory(invoice, 'invoices'),
+      operation: 'Invoice',
+      provider: providerLabel(readProviderSlug(invoice), invoice?.provider),
+      status: String(invoice.status || 'UNKNOWN').toUpperCase(),
+      currency: readCurrency(invoice),
+      amount: readAmount(invoice),
       icon: FileText,
       tone: statusTone[String(invoice.status || '').toUpperCase()] || 'info',
       title: `Invoice ${normalizeStatus(invoice.status)}`,
@@ -1600,6 +1702,12 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       search: readInvoiceId(invoice)
     })),
     ...payouts.map((payout) => ({
+      category: operationCategory(payout, 'payouts'),
+      operation: 'Payout',
+      provider: providerLabel(readProviderSlug(payout), payout?.provider),
+      status: String(payout.status || 'UNKNOWN').toUpperCase(),
+      currency: readCurrency(payout),
+      amount: readAmount(payout),
       icon: WalletCards,
       tone: statusTone[String(payout.status || '').toUpperCase()] || 'warn',
       title: `Payout ${normalizeStatus(payout.status)}`,
@@ -1609,6 +1717,12 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       search: readPayoutId(payout)
     })),
     ...topUpOrders.map((order) => ({
+      category: operationCategory(order, 'payments'),
+      operation: 'Payment',
+      provider: order.provider || order.method_title || 'Transferly',
+      status: String(order.status || 'UNKNOWN').toUpperCase(),
+      currency: order.currency || 'NGN',
+      amount: readAmount(order),
       icon: CreditCard,
       tone: statusTone[String(order.status || '').toUpperCase()] || 'warn',
       title: `Top-up ${normalizeStatus(order.status)}`,
@@ -1618,6 +1732,12 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       search: order.order_id || order.id
     })),
     ...receipts.slice(0, 8).map((receipt) => ({
+      category: operationCategory(receipt, 'receipts'),
+      operation: 'Receipt',
+      provider: receipt.provider || 'Transferly',
+      status: String(receipt.status || 'COMPLETED').toUpperCase(),
+      currency: receipt.currency || 'USD',
+      amount: readAmount(receipt),
       icon: FileText,
       tone: 'success',
       title: 'Receipt generated',
@@ -1627,6 +1747,12 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       search: receipt.id || receipt.title
     })),
     ...paymentIssues.map((issue) => ({
+      category: 'issues',
+      operation: 'Issue',
+      provider: issue.provider || 'Unknown provider',
+      status: String(issue.status || 'UNKNOWN').toUpperCase(),
+      currency: issue.currency || '',
+      amount: readAmount(issue),
       icon: ShieldAlert,
       tone: 'danger',
       title: issue.title || 'Payment issue',
@@ -1641,8 +1767,38 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
 export function ActivitySection() {
   const context = useAppContext();
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('all');
+  const [provider, setProvider] = useState('all');
+  const [status, setStatus] = useState('all');
+  const [currency, setCurrency] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const events = buildActivity(context);
-  const filtered = events.filter((event) => [event.title, event.body, event.search].join(' ').toLowerCase().includes(query.toLowerCase()));
+  const providers = [...new Set(events.map((event) => event.provider).filter(Boolean))].sort();
+  const currencies = [...new Set(events.map((event) => event.currency).filter(Boolean))].sort();
+  const filtered = events.filter((event) => {
+    const matchesCategory = category === 'all' || event.category === category;
+    const matchesProvider = provider === 'all' || event.provider === provider;
+    const matchesStatus = status === 'all' || event.status === status;
+    const matchesCurrency = currency === 'all' || event.currency === currency;
+    const matchesDateFrom = !dateFrom || event.timestamp >= new Date(`${dateFrom}T00:00:00`).getTime();
+    const matchesDateTo = !dateTo || event.timestamp <= new Date(`${dateTo}T23:59:59.999`).getTime();
+    const matchesAmount = !amountMax || event.amount <= Number(amountMax);
+    const matchesQuery = [event.title, event.body, event.search].join(' ').toLowerCase().includes(query.toLowerCase());
+    return matchesCategory && matchesProvider && matchesStatus && matchesCurrency && matchesDateFrom && matchesDateTo && matchesAmount && matchesQuery;
+  });
+  const filters = [
+    ['all', 'All'],
+    ['payments', 'Payments'],
+    ['invoices', 'Invoices'],
+    ['payouts', 'Payouts'],
+    ['refunds', 'Refunds'],
+    ['transfers', 'Transfers'],
+    ['receipts', 'Receipts'],
+    ['issues', 'Issues']
+  ];
 
   return (
     <div className="space-y-4">
@@ -1653,10 +1809,106 @@ export function ActivitySection() {
         <MetricCard icon={AlertTriangle} label="Attention" value={filtered.filter((event) => ['warn', 'danger'].includes(event.tone)).length.toLocaleString()} />
       </div>
       <SearchBar query={query} onQuery={setQuery} placeholder="Search timeline" />
+      <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Activity filters">
+        {filters.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setCategory(value)}
+            className={`miniapp-touch-target shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${
+              category === value
+                ? 'border-[var(--tg-button-color)] bg-[var(--tg-button-color)] text-[var(--tg-button-text-color)]'
+                : 'border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] text-[var(--tg-subtitle-text-color)]'
+            }`}
+            aria-pressed={category === value}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3" aria-label="Activity detail filters">
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          Provider
+          <select value={provider} onChange={(event) => setProvider(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+            <option value="all">All providers</option>
+            {providers.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          Status
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+            <option value="all">All statuses</option>
+            {[...new Set(events.map((event) => event.status).filter(Boolean))].sort().map((value) => <option key={value} value={value}>{normalizeStatus(value)}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          Currency
+          <select value={currency} onChange={(event) => setCurrency(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+            <option value="all">All currencies</option>
+            {currencies.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          From date
+          <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]" />
+        </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          To date
+          <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]" />
+        </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          Maximum amount
+          <input type="number" min="0" inputMode="decimal" value={amountMax} onChange={(event) => setAmountMax(event.target.value)} placeholder="Any amount" className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)] placeholder:text-[var(--tg-hint-color)]" />
+        </label>
+      </div>
       {filtered.length ? (
-        <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
-          <Timeline events={filtered} />
-        </section>
+        <>
+          <SurfaceCard className="p-5 shadow-sm">
+            <Timeline
+              events={filtered.map((event) => ({
+                ...event,
+                onSelect: () => setSelectedEvent(event)
+              }))}
+            />
+          </SurfaceCard>
+          {selectedEvent ? (
+            <SurfaceCard as="section" aria-label="Transaction detail" className="border-[var(--miniapp-accent-border)] p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--tg-hint-color)]">Transaction detail</p>
+                  <h3 className="mt-2 text-xl font-black text-[var(--tg-text-color)]">{selectedEvent.title}</h3>
+                </div>
+                <button type="button" onClick={() => setSelectedEvent(null)} className="miniapp-touch-target rounded-full bg-[var(--tg-secondary-bg-color)] px-3 text-xs font-black text-[var(--tg-text-color)]">Close</button>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ['Transferly transaction ID', selectedEvent.search],
+                  ['Provider', selectedEvent.provider],
+                  ['Operation', selectedEvent.operation],
+                  ['Amount', selectedEvent.amount !== null && selectedEvent.amount !== undefined ? formatMoney(selectedEvent.amount, selectedEvent.currency || 'USD') : 'Unavailable'],
+                  ['Currency', selectedEvent.currency || 'Unavailable'],
+                  ['Status', selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING' ? 'Reconciling' : normalizeStatus(selectedEvent.status)],
+                  ['Updated time', selectedEvent.time],
+                  ['Reconciliation', selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING' ? 'Reconciliation required' : 'No unresolved reconciliation signal']
+                ].map(([label, value]) => (
+                  <SurfaceCard as="div" key={label} className="rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
+                    <p className="text-xs font-bold text-[var(--tg-hint-color)]">{label}</p>
+                    <p className="mt-2 break-words text-sm font-black text-[var(--tg-text-color)]">{value || 'Unavailable'}</p>
+                  </SurfaceCard>
+                ))}
+              </div>
+              <SurfaceCard as="div" className="mt-4 rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Timeline</p>
+                <Timeline events={[selectedEvent]} />
+              </SurfaceCard>
+              {(selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING') ? (
+                <p className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
+                  Transaction outcome is being verified. Do not submit a duplicate retry until reconciliation is complete.
+                </p>
+              ) : null}
+            </SurfaceCard>
+          ) : null}
+        </>
       ) : (
         <EmptyState icon={Activity} title="No activity yet" body="Authenticated payment, payout, top-up, and receipt events will appear here as they happen." />
       )}
@@ -1686,6 +1938,35 @@ function buildMovementBars(invoices, payouts) {
   return days.map((day) => (day.total ? Math.max(8, Math.round((day.total / max) * 100)) : 4));
 }
 
+function summarizeRecords(records, successStatuses, failureStatuses) {
+  const successful = records.filter((record) => successStatuses.includes(String(record?.status || '').toUpperCase()));
+  const failed = records.filter((record) => failureStatuses.includes(String(record?.status || '').toUpperCase()));
+  const volume = records.reduce((sum, record) => sum + readAmount(record), 0);
+  return {
+    count: records.length,
+    volume,
+    average: records.length ? volume / records.length : 0,
+    successRate: records.length ? Math.round((successful.length / records.length) * 100) : 0,
+    failureRate: records.length ? Math.round((failed.length / records.length) * 100) : 0
+  };
+}
+
+function providerBreakdown(records) {
+  const grouped = new Map();
+  records.forEach((record) => {
+    const provider = providerLabel(readProviderSlug(record), record?.provider);
+    const current = grouped.get(provider) || { provider, count: 0, successful: 0, total: 0 };
+    current.count += 1;
+    current.total += readAmount(record);
+    if (['PAID', 'COMPLETED', 'SUCCEEDED'].includes(String(record?.status || '').toUpperCase())) current.successful += 1;
+    grouped.set(provider, current);
+  });
+  return [...grouped.values()].map((item) => ({
+    ...item,
+    successRate: item.count ? Math.round((item.successful / item.count) * 100) : 0
+  })).sort((left, right) => right.count - left.count);
+}
+
 export function AnalyticsSection() {
   const { invoices, payouts, receipts, topUpOrders, financeSummary } = useAppContext();
   const invoiceRecords = invoices;
@@ -1693,6 +1974,9 @@ export function AnalyticsSection() {
   const paidInvoices = invoiceRecords.filter((record) => String(record.status).toUpperCase() === 'PAID');
   const collected = financeSummary?.collected_cents ? financeSummary.collected_cents / 100 : paidInvoices.reduce((sum, record) => sum + readAmount(record), 0);
   const requested = financeSummary?.requested_payout_cents ? financeSummary.requested_payout_cents / 100 : payoutRecords.reduce((sum, record) => sum + readAmount(record), 0);
+  const paymentSummary = summarizeRecords(invoiceRecords, ['PAID', 'COMPLETED', 'SUCCEEDED'], ['FAILED', 'DISPUTED', 'CANCELLED', 'REJECTED']);
+  const payoutSummary = summarizeRecords(payoutRecords, ['COMPLETED', 'SUCCEEDED', 'PAID'], ['FAILED', 'DENIED', 'REJECTED', 'CANCELLED']);
+  const providerSummary = providerBreakdown([...invoiceRecords, ...payoutRecords]);
   const conversion = invoiceRecords.length ? Math.round((paidInvoices.length / invoiceRecords.length) * 100) : 0;
   const riskHoldRate = payoutRecords.length
     ? Math.round((payoutRecords.filter((record) => String(record.status).toUpperCase() === 'PENDING_APPROVAL').length / payoutRecords.length) * 100)
@@ -1730,6 +2014,34 @@ export function AnalyticsSection() {
         <MetricCard icon={Clock3} label="Open invoices" value={(financeSummary?.open_invoice_count ?? invoiceRecords.filter((record) => ['SENT', 'PENDING'].includes(String(record.status).toUpperCase())).length).toLocaleString()} detail="Awaiting customer action" />
         <MetricCard icon={ShieldAlert} label="Risk hold rate" value={`${riskHoldRate}%`} detail="Manual review pressure" />
       </div>
+      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Performance denominators</p><h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--tg-text-color)]">Payment and payout health</h3></div>
+          <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Visible records</span>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {[
+            ['Payments', paymentSummary, FileText],
+            ['Payouts', payoutSummary, WalletCards]
+          ].map(([label, summary, Icon]) => (
+            <SurfaceCard as="div" key={label} className="rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
+              <div className="flex items-center gap-2"><Icon size={18} className="text-[var(--tg-button-color)]" /><p className="text-sm font-black text-[var(--tg-text-color)]">{label}</p></div>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                <div><p className="font-bold text-[var(--tg-hint-color)]">Volume</p><p className="mt-1 text-lg font-black text-[var(--tg-text-color)]">{formatMoney(summary.volume)}</p></div>
+                <div><p className="font-bold text-[var(--tg-hint-color)]">Count</p><p className="mt-1 text-lg font-black text-[var(--tg-text-color)]">{summary.count.toLocaleString()}</p></div>
+                <div><p className="font-bold text-[var(--tg-hint-color)]">Average</p><p className="mt-1 font-black text-[var(--tg-text-color)]">{formatMoney(summary.average)}</p></div>
+                <div><p className="font-bold text-[var(--tg-hint-color)]">Success / failure</p><p className="mt-1 font-black text-[var(--tg-text-color)]">{summary.successRate}% / {summary.failureRate}%</p></div>
+              </div>
+            </SurfaceCard>
+          ))}
+        </div>
+      </section>
+      {providerSummary.length ? (
+        <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Provider analytics</p><h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--tg-text-color)]">Observed distribution</h3></div><span className="text-xs font-bold text-[var(--tg-hint-color)]">No recommendations from incomplete data</span></div>
+          <div className="mt-5 space-y-3">{providerSummary.map((provider) => <div key={provider.provider} className="rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-black text-[var(--tg-text-color)]">{provider.provider}</p><p className="text-xs font-black text-[var(--tg-hint-color)]">{provider.count} records</p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[var(--tg-button-color)]" style={{ width: `${provider.successRate}%` }} /></div><div className="mt-2 flex justify-between text-xs font-bold text-[var(--tg-subtitle-text-color)]"><span>{provider.successRate}% successful</span><span>{formatMoney(provider.total)} observed volume</span></div></div>)}</div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -2622,6 +2934,61 @@ export function RiskSection() {
 export function SecuritySection() {
   const { user, profile, telegramAuthState } = useAppContext();
   const telegram = useTelegramMiniApp();
+  const [sessions, setSessions] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
+  const [securityLoading, setSecurityLoading] = useState(true);
+  const [securityError, setSecurityError] = useState('');
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newSecret, setNewSecret] = useState('');
+
+  const loadSecurityResources = async () => {
+    setSecurityLoading(true);
+    setSecurityError('');
+    try {
+      const [sessionResult, keyResult] = await Promise.all([listMySessions(), listMyApiKeys()]);
+      setSessions(sessionResult?.sessions || []);
+      setApiKeys(keyResult?.keys || []);
+    } catch (error) {
+      setSecurityError(error.message || 'Unable to load account security resources.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (telegramAuthState === 'authenticated') {
+      loadSecurityResources();
+    } else {
+      setSecurityLoading(false);
+    }
+  }, [telegramAuthState]);
+
+  const confirmAndRun = async (message, action, successMessage) => {
+    if (!window.confirm(message)) return;
+    try {
+      await action();
+      toast.success(successMessage);
+      await loadSecurityResources();
+    } catch (error) {
+      toast.error(error.message || 'Security action failed.');
+    }
+  };
+
+  const createKey = async () => {
+    if (!newKeyName.trim()) {
+      toast.error('Enter a name for the API key.');
+      return;
+    }
+    try {
+      const result = await createMyApiKey({ name: newKeyName.trim(), scopes: ['providers:read', 'transactions:read'] });
+      setNewSecret(result.secret || '');
+      setNewKeyName('');
+      await loadSecurityResources();
+      toast.success('API key created. Copy the secret now; it will not be shown again.');
+    } catch (error) {
+      toast.error(error.message || 'Unable to create API key.');
+    }
+  };
   const rows = [
     ['Telegram runtime', telegram.available ? 'Detected' : 'Browser preview'],
     ['Telegram auth', telegramAuthState],
@@ -2646,11 +3013,56 @@ export function SecuritySection() {
             </div>
           ))}
         </div>
+        {telegramAuthState === 'authenticated' ? (
+          <div className="mt-5 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Account access</p>
+                <h3 className="mt-1 text-lg font-black text-[var(--tg-text-color)]">Sessions and API keys</h3>
+              </div>
+              <button type="button" onClick={loadSecurityResources} className="rounded-full bg-[var(--tg-secondary-bg-color)] p-3 text-[var(--tg-hint-color)]" aria-label="Refresh security resources">
+                <RefreshCw size={16} />
+              </button>
+            </div>
+            {securityError ? <p className="rounded-2xl bg-rose-400/10 p-3 text-sm font-bold text-rose-200">{securityError}</p> : null}
+            {securityLoading ? <p className="text-sm font-bold text-[var(--tg-hint-color)]">Loading protected resources…</p> : null}
+            {!securityLoading ? (
+              <>
+                <div className="space-y-2">
+                  {sessions.map((session) => (
+                    <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4">
+                      <div>
+                        <p className="text-sm font-black text-[var(--tg-text-color)]">{session.isCurrent ? 'Current session' : 'Other session'}</p>
+                        <p className="text-xs text-[var(--tg-hint-color)]">Created {formatDate(session.createdAt)} · {session.status}</p>
+                      </div>
+                      {session.status === 'active' && !session.isCurrent ? <SecondaryButton icon={ShieldAlert} onClick={() => confirmAndRun('Revoke this session?', () => revokeMySession(session.id), 'Session revoked')}>Revoke</SecondaryButton> : null}
+                    </div>
+                  ))}
+                  {!sessions.length ? <p className="text-sm text-[var(--tg-hint-color)]">No interactive sessions are available.</p> : null}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input value={newKeyName} onChange={(event) => setNewKeyName(event.target.value)} placeholder="New API key name" className="min-w-0 flex-1 rounded-2xl bg-[var(--tg-secondary-bg-color)] px-4 py-3 text-sm font-bold text-[var(--tg-text-color)] outline-none" />
+                    <SecondaryButton icon={Plus} onClick={createKey}>Create</SecondaryButton>
+                  </div>
+                  {newSecret ? <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-amber-100">Copy once</p><code className="mt-2 block break-all text-xs font-bold text-amber-50">{newSecret}</code></div> : null}
+                  {apiKeys.map((key) => (
+                    <div key={key.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4">
+                      <div><p className="text-sm font-black text-[var(--tg-text-color)]">{key.name}</p><p className="text-xs text-[var(--tg-hint-color)]">{key.prefix}… · {key.status} · {key.scopes.join(', ')}</p></div>
+                      {key.status === 'active' ? <div className="flex gap-2"><SecondaryButton icon={RotateCcw} onClick={() => confirmAndRun('Rotate this API key? Its current secret will stop working.', async () => { const result = await rotateMyApiKey(key.id); setNewSecret(result.secret || ''); }, 'API key rotated')}>Rotate</SecondaryButton><SecondaryButton icon={ShieldAlert} onClick={() => confirmAndRun('Revoke this API key?', () => revokeMyApiKey(key.id), 'API key revoked')}>Revoke</SecondaryButton></div> : null}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : <p className="mt-5 rounded-2xl bg-amber-300/10 p-4 text-sm font-bold text-amber-100">Open Transferly through Telegram to manage protected sessions and API keys.</p>}
         <div className="mt-5 flex flex-wrap gap-2">
           <SecondaryButton icon={Copy} onClick={() => toast.success('Masked session reference copied')}>Copy safe reference</SecondaryButton>
           <SecondaryButton icon={Download} onClick={() => toast.success('Audit export queued')}>Export audit</SecondaryButton>
         </div>
       </section>
+      <OrganizationTeamSection />
     </div>
   );
 }

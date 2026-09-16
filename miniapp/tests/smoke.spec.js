@@ -938,6 +938,28 @@ async function mockTransferlyApi(page, options = {}) {
       return;
     }
 
+    if (path === '/api/admin/audit-logs') {
+      await json({
+        data: [
+          {
+            id: 'audit-admin-1001',
+            actorType: 'admin',
+            actorId: 'admin-user',
+            action: 'points_funding.approved',
+            entityType: 'points_funding_request',
+            entityId: 'funding-admin-1001',
+            metadata: {
+              reason: 'Payment verified',
+              request_id: 'req-audit-1001',
+              access_token: 'redacted'
+            },
+            createdAt: '2026-08-09T11:30:00.000Z'
+          }
+        ]
+      });
+      return;
+    }
+
     if (path === '/api/admin/finance/overview') {
       await json({
         overview: {
@@ -1367,6 +1389,8 @@ test('mini app command center renders with mocked account data', async ({ page }
   await expect(page.getByRole('link', { name: /AO Admin Operator/ })).toBeVisible();
   await expect(page.getByText('5,000 pts').last()).toBeVisible();
   await expect(page.getByRole('link', { name: /Buy Points/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+  await expect(page.getByText('Provider workspaces', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Support AI Reply/i }).first()).toBeVisible();
 });
 
@@ -1385,6 +1409,60 @@ test('mini app command search filters actions and navigates', async ({ page }) =
   await page.getByRole('button', { name: 'Open Receipt vault' }).click();
   await expect(page).toHaveURL(/\/miniapp\/vault$/);
   await expect(dialog).toBeHidden();
+});
+
+test('mini app universal search groups financial records and services', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+  await page.goto('/miniapp');
+
+  await page.getByRole('button', { name: 'Open Transferly command search' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Search Transferly' });
+  await page.getByRole('searchbox', { name: 'Search Transferly actions' }).fill('invoice');
+
+  await expect(dialog.getByRole('heading', { name: 'Records and services' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Invoice/i }).last()).toBeVisible();
+});
+
+test('mini app activity exposes transaction center filters', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+  await page.goto('/miniapp/activity');
+
+  await expect(page.getByRole('heading', { name: /Every meaningful state change/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refunds' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Transfers' })).toBeVisible();
+  await expect(page.getByLabel('Provider')).toBeVisible();
+  await expect(page.getByLabel('Status')).toBeVisible();
+  await expect(page.getByLabel('Currency')).toBeVisible();
+  await expect(page.getByLabel('From date')).toBeVisible();
+  await expect(page.getByLabel('To date')).toBeVisible();
+  await expect(page.getByLabel('Maximum amount')).toBeVisible();
+  await page.getByRole('button', { name: 'Refunds' }).click();
+  await expect(page.getByRole('main')).toContainText(/No activity yet|Refund/i);
+});
+
+test('mini app activity opens transaction detail metadata', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+  await page.goto('/miniapp/activity');
+
+  const timeline = page.locator('main').getByRole('button').filter({ hasText: /Invoice|Payout|Top-up|Receipt/ }).first();
+  await timeline.click();
+  await expect(page.getByRole('region', { name: 'Transaction detail' })).toBeVisible();
+  await expect(page.getByText('Transferly transaction ID')).toBeVisible();
+  await expect(page.getByText('Reconciliation')).toBeVisible();
+});
+
+test('mini app services exposes normalized discovery filters', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+  await page.goto('/miniapp/services');
+
+  await expect(page.getByRole('heading', { name: 'Services' })).toBeVisible();
+  await expect(page.getByLabel('Filter services by provider')).toBeVisible();
+  await expect(page.getByLabel('Filter services by operation')).toBeVisible();
+  await expect(page.getByLabel('Filter services by availability')).toBeVisible();
 });
 
 test('mini app checks client health without blocking workspace startup', async ({ page }) => {
@@ -1576,8 +1654,15 @@ test('mini app route audit stays nonblank and responsive across core screens', a
   ];
 
   const viewports = [
+    { width: 320, height: 568 },
+    { width: 360, height: 800 },
+    { width: 375, height: 812 },
     { width: 390, height: 844 },
+    { width: 414, height: 896 },
+    { width: 430, height: 932 },
+    { width: 768, height: 1024 },
     { width: 820, height: 1180 },
+    { width: 1024, height: 1366 },
     { width: 1440, height: 900 }
   ];
 
@@ -2458,6 +2543,39 @@ test('admin finance center loads funding queue and opens funding review', async 
   await expect(page.getByRole('dialog').getByText('₦5,000 = 5,000 pts')).toBeVisible();
   await expect(page.getByRole('dialog').getByText('1 Point = ₦1')).toBeVisible();
   await expect(page.getByRole('dialog').getByText('TRANSFERLY TEST SERVICES')).toBeVisible();
+});
+
+test('admin transaction center loads ledger and exception records', async ({ page }) => {
+  await mockTransferlyApi(page);
+  await page.goto('/admin?tab=transactions');
+
+  await expect(page.getByRole('heading', { name: 'Transaction center' })).toBeVisible();
+  await expect(page.getByRole('combobox')).toBeVisible();
+  await expect(page.getByRole('combobox').locator('option[value="ledger"]')).toHaveCount(1);
+  await expect(page.getByRole('combobox').locator('option[value="issue"]')).toHaveCount(1);
+  await expect(page.getByText('Records', { exact: true })).toBeVisible();
+});
+
+test('admin audit log shows immutable events without sensitive metadata', async ({ page }) => {
+  await mockTransferlyApi(page);
+  await page.goto('/admin?tab=audit');
+
+  await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+  await expect(page.getByText('points_funding.approved')).toBeVisible();
+  await expect(page.getByText('Payment verified')).toBeVisible();
+  await expect(page.getByText('access_token')).toHaveCount(0);
+});
+
+test('admin overview prioritizes operational exceptions and provider health', async ({ page }) => {
+  await mockTransferlyApi(page);
+  await page.goto('/admin?tab=overview');
+
+  await expect(page.getByRole('heading', { name: 'Exception-first overview' })).toBeVisible();
+  await expect(page.getByText('Funding reviews', { exact: true })).toBeVisible();
+  await expect(page.getByText('Risk cases', { exact: true })).toBeVisible();
+  await expect(page.getByText('Reconciliation', { exact: true })).toBeVisible();
+  await expect(page.getByText('Provider health', { exact: true })).toBeVisible();
+  await expect(page.getByText('Attention queue', { exact: true })).toBeVisible();
 });
 
 test('admin risk center loads cases and signals without exposing rule thresholds', async ({ page }) => {

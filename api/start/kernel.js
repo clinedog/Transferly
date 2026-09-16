@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const config = require('../config');
 const { assignRequestId } = require('../middleware/requestContext');
 const { authenticateRequest } = require('../middleware/authenticateRequest');
+const { resolveOrganizationContext } = require('../middleware/resolveOrganizationContext');
 const { errorHandler, notFoundHandler } = require('../middleware/errorHandler');
 const { registerRoutes } = require('../routes');
 const {
@@ -22,6 +23,7 @@ const {
 } = require('../core/config/httpPolicy');
 const { buildJsonBodyParserOptions } = require('../core/webhooks/rawBodyCapture');
 const { logger } = require('../utils/logger');
+const { buildOpenApiDocument } = require('../openapi');
 
 function configureHttpKernel(app) {
   const requestLogger = createHttpRequestLogger({ logger });
@@ -36,6 +38,7 @@ function configureHttpKernel(app) {
   app.use(requestLogger);
   app.use(express.json(buildJsonBodyParserOptions()));
   app.use(authenticateRequest);
+  app.use(resolveOrganizationContext);
   app.use(rateLimit(buildApiRateLimitOptions({ config })));
   app.get('/health', (request, response) => {
     response.json(buildHealthPayload({ request, config }));
@@ -96,6 +99,12 @@ function configureHttpKernel(app) {
   }
 
   registerRoutes(app);
+
+  const openApiHandler = (_request, response) => {
+    response.json(buildOpenApiDocument({ baseUrl: config.APP_BASE_URL }));
+  };
+  app.get('/api/openapi.json', openApiHandler);
+  app.get('/api/v1/openapi.json', openApiHandler);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

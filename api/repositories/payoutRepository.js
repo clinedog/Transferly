@@ -26,6 +26,7 @@ function mapPayout(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id || null,
     payoutBatchId: row.payout_batch_id,
     idempotencyKey: row.idempotency_key,
     senderBatchId: row.sender_batch_id,
@@ -75,8 +76,8 @@ async function create(data, client = db) {
         id, user_id, payout_batch_id, idempotency_key, sender_batch_id, paypal_payout_item_id,
         status, risk_decision, recipient_type, receiver, receiver_country_code, amount_cents,
         currency_code, note, failure_reason, metadata_json, approved_by_actor_id, approved_at,
-        rejected_at, processed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        rejected_at, processed_at, created_at, updated_at, on_hold, held_by_actor_id, held_at, hold_reason, organization_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
@@ -100,7 +101,12 @@ async function create(data, client = db) {
       data.rejectedAt || null,
       data.processedAt || null,
       now,
-      now
+      now,
+      data.onHold ? 1 : 0,
+      data.heldByActorId || null,
+      data.heldAt || null,
+      data.holdReason || null,
+      data.organizationId || `personal:${data.userId}`
     ]
   );
 
@@ -160,6 +166,10 @@ function buildFindManyWhere(filters) {
   if (filters.userId) {
     clauses.push('p.user_id = ?');
     params.push(filters.userId);
+  }
+  if (filters.organizationId) {
+    clauses.push('p.organization_id = ?');
+    params.push(filters.organizationId);
   }
   if (filters.status) {
     clauses.push('p.status = ?');

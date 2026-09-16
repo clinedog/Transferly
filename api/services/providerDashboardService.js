@@ -205,7 +205,7 @@ function buildSettingsSummary(capability, readiness, health, registryStatus) {
   const missingEnv = readiness.missing_env || [];
   const requiredEnv = registryStatus?.required_env || capability.registry_status?.required_env || [];
   const enabledActions = readiness.operations
-    .filter((operation) => operation.implemented)
+    .filter((operation) => operation.execution_eligible?.production)
     .map((operation) => operation.operation);
 
   return {

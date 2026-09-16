@@ -31,6 +31,10 @@ async function loadAccessibleInvoice(request, response, invoiceId) {
   }
 
   assertCanAccessUserResource(request, invoice.userId);
+  if (request.auth.organizationId && invoice.organizationId !== request.auth.organizationId) {
+    response.status(404).json({ code: 'INVOICE_NOT_FOUND', message: 'Invoice not found.' });
+    return null;
+  }
   return invoice;
 }
 
@@ -48,6 +52,7 @@ async function createInvoiceController(request, response) {
   const result = await dispatchInvoiceCreation({
     ...body,
     userId: resolveUserIdForRequest(request, body.userId),
+    organizationId: request.auth.organizationId,
     requestId: request.id
   });
   response.status(201).json(result);
@@ -81,7 +86,7 @@ async function listInvoicesController(request, response) {
     pageSize,
     offset: (query.page - 1) * pageSize
   };
-  const scopedFilters = userId ? { ...filters, userId } : filters;
+  const scopedFilters = { ...filters, ...(userId ? { userId } : {}), organizationId: request.auth.organizationId };
   const [invoices, total] = await Promise.all([
     invoiceRepository.findMany(scopedFilters),
     invoiceRepository.countMany(scopedFilters)

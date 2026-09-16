@@ -70,6 +70,8 @@ async function findByEmail(email, client = db) {
 
 async function upsert(data, client = db) {
   const now = new Date().toISOString();
+  const userId = data.id;
+  const personalOrganizationId = `personal:${userId}`;
 
   await client.run(
     `
@@ -81,10 +83,27 @@ async function upsert(data, client = db) {
         country_code = excluded.country_code,
         updated_at = excluded.updated_at
     `,
-    [data.id, data.email.toLowerCase(), data.displayName || null, data.countryCode || null, now, now]
+    [userId, data.email.toLowerCase(), data.displayName || null, data.countryCode || null, now, now]
   );
 
-  return findById(data.id, client);
+  await client.run(
+    `
+      INSERT OR IGNORE INTO organizations (id, name, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+    [personalOrganizationId, `${data.displayName || data.email || userId}'s workspace`, userId, now, now]
+  );
+
+  await client.run(
+    `
+      INSERT OR IGNORE INTO organization_memberships (
+        id, organization_id, user_id, role, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'active', ?, ?)
+    `,
+    [`membership:${personalOrganizationId}`, personalOrganizationId, userId, 'OWNER', now, now]
+  );
+
+  return findById(userId, client);
 }
 
 async function deleteById(userId, client = db) {

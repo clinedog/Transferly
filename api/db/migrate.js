@@ -59,6 +59,9 @@ const REQUIRED_TABLES = Object.freeze([
   'referral_events',
   'telegram_accounts',
   'telegram_command_logs'
+  , 'organizations'
+  , 'organization_memberships'
+  , 'organization_invitations'
 ]);
 
 async function ensureColumn(client, tableName, columnName, columnDefinition) {

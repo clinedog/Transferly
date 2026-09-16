@@ -50,10 +50,13 @@ const PROVIDER_OPERATION_KEYS = Object.freeze(Object.values(PROVIDER_OPERATION))
 const EXECUTION_STATUS = Object.freeze({
   UNSUPPORTED: 'unsupported',
   PLANNED: 'planned',
+  COMING_SOON: 'coming_soon',
   PREVIEW: 'preview',
   SANDBOX: 'sandbox',
   LIVE: 'live',
-  DISABLED: 'disabled'
+  DISABLED: 'disabled',
+  DEGRADED: 'degraded',
+  MAINTENANCE: 'maintenance'
 });
 
 const EXECUTION_STATUS_KEYS = Object.freeze(Object.values(EXECUTION_STATUS));
@@ -68,7 +71,8 @@ const PAYMENT_METHOD = Object.freeze({
   USSD: 'ussd',
   QR: 'qr',
   WALLET: 'wallet',
-  DIRECT_DEBIT: 'direct_debit'
+  DIRECT_DEBIT: 'direct_debit',
+  BNPL: 'bnpl'
 });
 
 const PAYMENT_METHOD_KEYS = Object.freeze(Object.values(PAYMENT_METHOD));
@@ -103,6 +107,22 @@ const OPERATION_BY_TRANSACTION_TYPE = Object.freeze({
   [TRANSACTION_TYPE.REFUND]: PROVIDER_OPERATION.REFUNDS,
   [TRANSACTION_TYPE.SUBSCRIPTION]: PROVIDER_OPERATION.SUBSCRIPTIONS,
   [TRANSACTION_TYPE.TOP_UP]: PROVIDER_OPERATION.PAYMENTS
+});
+
+// Adapter methods remain provider-specific implementation details. This map is
+// the one place where they are translated into Transferly's public operations.
+const CANONICAL_OPERATION_METHODS = Object.freeze({
+  [PROVIDER_OPERATION.PAYMENTS]: ['createPayment'],
+  [PROVIDER_OPERATION.PAYOUTS]: ['createPayout', 'previewPayout'],
+  [PROVIDER_OPERATION.REFUNDS]: ['createRefund', 'getRefund'],
+  [PROVIDER_OPERATION.INVOICES]: ['createInvoice', 'sendInvoice', 'previewInvoice'],
+  [PROVIDER_OPERATION.PAYMENT_LINKS]: ['createPaymentLink', 'createInvoice', 'previewInvoice'],
+  [PROVIDER_OPERATION.TRANSFERS]: ['createTransfer', 'createPayout', 'previewPayout'],
+  [PROVIDER_OPERATION.SUBSCRIPTIONS]: ['createSubscription'],
+  [PROVIDER_OPERATION.BALANCES]: ['getBalance'],
+  [PROVIDER_OPERATION.CUSTOMERS]: ['createCustomer'],
+  [PROVIDER_OPERATION.WALLETS]: ['getWallet'],
+  [PROVIDER_OPERATION.VIRTUAL_ACCOUNTS]: ['createVirtualAccount']
 });
 
 // ---------------------------------------------------------------------------
@@ -153,7 +173,11 @@ const PAYMENT_METHOD_ALIASES = Object.freeze({
   wallet_payments: 'wallet',
   direct_debit: 'direct_debit',
   directdebit: 'direct_debit',
-  'direct-debit': 'direct_debit'
+  'direct-debit': 'direct_debit',
+  bnpl: 'bnpl',
+  buy_now_pay_later: 'bnpl',
+  'buy-now-pay-later': 'bnpl',
+  'buy-now-pay-later-payment': 'bnpl'
 });
 
 function normalizePaymentMethod(value) {
@@ -202,7 +226,8 @@ const EXECUTION_STATUS_ALIASES = Object.freeze({
   not_supported: 'unsupported',
   planned: 'planned',
   roadmap: 'planned',
-  coming_soon: 'planned',
+  coming_soon: 'coming_soon',
+  'coming-soon': 'coming_soon',
   preview: 'preview',
   sandbox: 'sandbox',
   sandbox_ready: 'sandbox',
@@ -301,10 +326,16 @@ function normalizeCapabilities(caps = {}, { environment } = {}) {
   const countries = caps.countries || caps.supportedCountries || [];
   const currencies = caps.currencies || caps.supportedCurrencies || [];
 
-  const scope =
+  const countryScope =
     caps.countries === 'all' || caps.supportedCountries === 'all'
       ? 'global'
       : Array.isArray(countries) && countries.length > 0
+        ? 'allowlist'
+        : 'unspecified';
+  const currencyScope =
+    caps.currencies === 'all' || caps.supportedCurrencies === 'all'
+      ? 'global'
+      : Array.isArray(currencies) && currencies.length > 0
         ? 'allowlist'
         : 'unspecified';
 
@@ -315,9 +346,9 @@ function normalizeCapabilities(caps = {}, { environment } = {}) {
     operations,
     paymentMethods: Object.freeze([...paymentMethods]),
     countries: Object.freeze((Array.isArray(countries) ? countries : []).map(normalizeCountryCode).filter(Boolean)),
-    countryScope: scope,
+    countryScope,
     currencies: Object.freeze((Array.isArray(currencies) ? currencies : []).map(normalizeCurrencyCode).filter(Boolean)),
-    currencyScope: scope
+    currencyScope
   });
 }
 
@@ -344,6 +375,401 @@ function supportsCurrency(normalizedCapabilities, currencyCode) {
   return Boolean(code && normalizedCapabilities.currencies.includes(code));
 }
 
+function statusPriority(status) {
+  return [
+    EXECUTION_STATUS.UNSUPPORTED,
+    EXECUTION_STATUS.PLANNED,
+    EXECUTION_STATUS.COMING_SOON,
+    EXECUTION_STATUS.PREVIEW,
+    EXECUTION_STATUS.SANDBOX,
+    EXECUTION_STATUS.LIVE
+  ].indexOf(status);
+}
+
+function resolveOperationStatus(adapterContract, operation, declaredStatus) {
+  const override = normalizeExecutionStatus(declaredStatus);
+  if (override) return override;
+
+  const methodStatuses = (CANONICAL_OPERATION_METHODS[operation] || [])
+    .map((method) => normalizeExecutionStatus(adapterContract?.operations?.[method]?.status))
+    .filter(Boolean);
+  if (methodStatuses.length === 0) return EXECUTION_STATUS.UNSUPPORTED;
+
+  return methodStatuses.reduce(
+    (mostReady, candidate) => statusPriority(candidate) > statusPriority(mostReady) ? candidate : mostReady,
+    EXECUTION_STATUS.UNSUPPORTED
+  );
+}
+
+/**
+ * Produce the safe, canonical representation consumed by readiness, routing,
+ * admin, and UI surfaces. It deliberately contains configuration names, never
+ * credential values or provider request material.
+ */
+function buildProviderReadinessDescriptor({
+  provider,
+  adapterContract = {},
+  summary = {},
+  enabled = false,
+  operationStatuses = {}
+} = {}) {
+  const configured = Boolean(adapterContract.configured);
+  const environment = String(adapterContract.mode || summary.mode || '').trim().toLowerCase() || null;
+  const capabilities = normalizeCapabilities(summary.capabilities || {}, { environment });
+  const operationNames = [...new Set([...PROVIDER_OPERATION_KEYS, ...Object.keys(operationStatuses)])];
+  const operations = Object.fromEntries(operationNames.map((operation) => {
+    const status = resolveOperationStatus(adapterContract, operation, operationStatuses[operation]);
+    const execution = describeOperation({ status, environment });
+    const productionEligible = enabled && configured && execution.productionEligible;
+    const sandboxEligible = enabled && configured && execution.sandboxEligible;
+    return [operation, Object.freeze({
+      operation,
+      operationStatus: status,
+      executionEligible: Object.freeze({
+        production: productionEligible,
+        sandbox: sandboxEligible,
+        requestedEnvironment: execution.executionEligible.requestedEnvironment,
+        eligibleForRequestedEnvironment: environment === 'sandbox' || environment === 'test'
+          ? sandboxEligible
+          : environment === 'live' || environment === 'production'
+            ? productionEligible
+            : null
+      }),
+      productionEnabled: productionEligible,
+      sandboxEnabled: sandboxEligible
+    })];
+  }));
+
+  const requiredEnv = Object.freeze([...(adapterContract.required_env || [])]);
+  const missingEnv = Object.freeze([...(adapterContract.missing_env || [])]);
+  const providerStatus = String(summary.status || (configured ? 'configured' : 'not_configured'));
+
+  return Object.freeze({
+    provider: normalizeProviderKey(provider || adapterContract.provider),
+    status: providerStatus,
+    environment,
+    enabled: Boolean(enabled),
+    productionEnabled: Object.values(operations).some((operation) => operation.productionEnabled),
+    sandboxEnabled: Object.values(operations).some((operation) => operation.sandboxEnabled),
+    countries: capabilities.countries,
+    countryScope: capabilities.countryScope,
+    currencies: capabilities.currencies,
+    currencyScope: capabilities.currencyScope,
+    paymentMethods: capabilities.paymentMethods,
+    limits: summary.limits || null,
+    requiredConfiguration: requiredEnv,
+    missingConfiguration: missingEnv,
+    requiredCredentials: requiredEnv,
+    missingCredentials: missingEnv,
+    required_env: requiredEnv,
+    missing_env: missingEnv,
+    configured,
+    operations: Object.freeze(operations)
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Result + error normalization (provider-agnostic)
+//
+// Converts raw provider responses and errors into canonical Transferly shapes
+// so provider-specific formats never leak into domain logic. Two safety rules
+// are enforced here:
+//   - An unknown or ambiguous raw outcome is NEVER normalized to success.
+//     (reconciliation_required is raised instead so it can be reviewed.)
+//   - Provider request material / credential values are screened out of
+//     metadata before it can reach logs, API responses, or the client.
+// ---------------------------------------------------------------------------
+
+/** Canonical financial outcome of a provider operation. */
+const RESULT_STATE = Object.freeze({
+  SUCCESS: 'success',
+  FAILED: 'failed',
+  UNKNOWN: 'unknown'
+});
+
+const RESULT_STATE_KEYS = Object.freeze(Object.values(RESULT_STATE));
+
+/**
+ * Settlement is a separate concept from outcome. A provider may report success
+ * (the operation executed) while settlement is still pending. The internal
+ * ledger remains the authority for final balance changes.
+ */
+const SETTLEMENT_STATE = Object.freeze({
+  SETTLED: 'settled',
+  PENDING: 'pending',
+  UNKNOWN: 'unknown'
+});
+
+const SETTLEMENT_STATE_KEYS = Object.freeze(Object.values(SETTLEMENT_STATE));
+
+/** Canonical categories for a normalized provider error. */
+const PROVIDER_ERROR_CATEGORY = Object.freeze({
+  AUTHENTICATION: 'authentication',
+  CONFIGURATION: 'configuration',
+  RATE_LIMIT: 'rate_limit',
+  TIMEOUT: 'timeout',
+  CONNECTIVITY: 'connectivity',
+  PROVIDER_DOWN: 'provider_down',
+  INSUFFICIENT_FUNDS: 'insufficient_funds',
+  INVALID_REQUEST: 'invalid_request',
+  DECLINED: 'declined',
+  DUPLICATE: 'duplicate',
+  UNKNOWN: 'unknown'
+});
+
+const PROVIDER_ERROR_CATEGORY_KEYS = Object.freeze(Object.values(PROVIDER_ERROR_CATEGORY));
+
+const RETRYABLE_ERROR_CATEGORIES = Object.freeze(new Set([
+  PROVIDER_ERROR_CATEGORY.TIMEOUT,
+  PROVIDER_ERROR_CATEGORY.CONNECTIVITY,
+  PROVIDER_ERROR_CATEGORY.RATE_LIMIT,
+  PROVIDER_ERROR_CATEGORY.PROVIDER_DOWN
+]));
+
+/** Canonical categorization of an inbound webhook/provider event. */
+const WEBHOOK_EVENT_CATEGORY = Object.freeze({
+  FINANCIAL: 'financial',
+  DISPUTE: 'dispute',
+  ADMINISTRATIVE: 'administrative',
+  UNKNOWN: 'unknown'
+});
+
+const WEBHOOK_EVENT_CATEGORY_KEYS = Object.freeze(Object.values(WEBHOOK_EVENT_CATEGORY));
+
+// Explicit hints used for conservative outcome normalization. Anything not
+// listed resolves to UNKNOWN so reconciliation is triggered, never silent.
+const SUCCESS_TERMS = Object.freeze(new Set([
+  'success', 'successful', 'successfully', 'succeeded', 'completed', 'complete',
+  'paid', 'captured', 'approved', 'settled', 'fulfilled', 'done', 'ok', 'okay'
+]));
+
+const FAILED_TERMS = Object.freeze(new Set([
+  'failed', 'failure', 'rejected', 'refused', 'declined', 'denied', 'cancelled',
+  'canceled', 'voided', 'expired', 'blocked', 'error', 'errored', 'faulted'
+]));
+
+const PENDING_TERMS = Object.freeze(new Set([
+  'pending', 'processing', 'in_progress', 'in-progress', 'awaiting',
+  'authorized', 'authorization', 'on_hold', 'on-hold', 'hold'
+]));
+
+// Raw keys that must never survive metadata screening (lower-case match).
+const SENSITIVE_METADATA_KEYS = Object.freeze(new Set([
+  'secret', 'secrets', 'client_secret', 'clientsecret', 'token', 'tokens',
+  'access_token', 'accesstoken', 'refresh_token', 'refreshtoken', 'password',
+  'passphrase', 'api_key', 'apikey', 'private_key', 'privatekey',
+  'authorization', 'authorization_header', 'signature', 'sig', 'cvv', 'cvc',
+  'pan', 'card_number', 'cardnumber', 'cc', 'secret_key', 'secretkey',
+  'webhook_secret'
+]));
+
+/**
+ * Maps a raw provider status into a canonical financial outcome.
+ *
+ * Normalization is deliberately conservative: an empty string, any pending/
+ * in-flight term, and any unrecognised status resolve to UNKNOWN. A raw status
+ * is never upgraded to SUCCESS just because it is present.
+ *
+ * @param {boolean|string|null|undefined} rawStatus
+ * @returns {{state: string, matched: string|null}}
+ */
+function normalizeProviderOutcome(rawStatus) {
+  if (rawStatus === true) return { state: RESULT_STATE.SUCCESS, matched: 'explicit_true' };
+  if (rawStatus === false) return { state: RESULT_STATE.FAILED, matched: 'explicit_false' };
+
+  const raw = String(rawStatus ?? '').trim().toLowerCase();
+  if (!raw) return { state: RESULT_STATE.UNKNOWN, matched: null };
+  if (PENDING_TERMS.has(raw)) return { state: RESULT_STATE.UNKNOWN, matched: raw };
+  if (SUCCESS_TERMS.has(raw)) return { state: RESULT_STATE.SUCCESS, matched: raw };
+  if (FAILED_TERMS.has(raw)) return { state: RESULT_STATE.FAILED, matched: raw };
+  return { state: RESULT_STATE.UNKNOWN, matched: raw };
+}
+
+/**
+ * Classifies an error into a canonical category with a deterministic answer
+ * about whether it is safe to retry. The raw message is never surfaced.
+ *
+ * @param {object} [error]
+ * @param {string} [fallbackCode]
+ * @returns {object} normalized, safe error descriptor
+ */
+function categorizeProviderError(error = {}, fallbackCode = 'PROVIDER_ERROR') {
+  const code = String(error?.code || error?.name || '').toLowerCase();
+  const message = String(error?.message || error?.msg || '').toLowerCase();
+  const text = `${code} ${message}`.trim();
+
+  let category = PROVIDER_ERROR_CATEGORY.UNKNOWN;
+  if (/\b(401|unauthorized|invalid.credentials|authentication|auth.token|invalid.token)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.AUTHENTICATION;
+  } else if (/\b(429|rate.limit|too.many.requests|throttl)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.RATE_LIMIT;
+  } else if (/\b(timeout|timed.out|timed_out|deadline)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.TIMEOUT;
+  } else if (/\b(502|503|504|service.unavailable|gateway|maintenance)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.PROVIDER_DOWN;
+  } else if (/\b(connection|connectivity|network|econnreset|econnrefused|socket|unreachable|dns)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.CONNECTIVITY;
+  } else if (/\b(insufficient.funds|low.balance|no.funds)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.INSUFFICIENT_FUNDS;
+  } else if (/\b(duplicate|already.exists|idempotency)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.DUPLICATE;
+  } else if (/\b(declined|do.not.honor|card.declined)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.DECLINED;
+  } else if (/\b(400|422|invalid|missing.field|schema|interrupt)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.INVALID_REQUEST;
+  } else if (/\b(environment|configuration|misconfigur|env)\b/.test(text)) {
+    category = PROVIDER_ERROR_CATEGORY.CONFIGURATION;
+  }
+
+  const outcome = normalizeProviderOutcome(error?.status);
+
+  return Object.freeze({
+    code: String(error?.code || error?.name || fallbackCode),
+    category,
+    retryable: RETRYABLE_ERROR_CATEGORIES.has(category),
+    timeout: category === PROVIDER_ERROR_CATEGORY.TIMEOUT,
+    auth_required: category === PROVIDER_ERROR_CATEGORY.AUTHENTICATION,
+    rate_limited: category === PROVIDER_ERROR_CATEGORY.RATE_LIMIT,
+    outcome: outcome.state,
+    raw_provider_error_exposed: false
+  });
+}
+
+/**
+ * Redacts credential-shaped values and sensitive keys from arbitrary provider
+ * metadata. Depth- and key-count-limited so huge payloads cannot be echoed.
+ *
+ * @param {object} [metadata]
+ * @param {object} [opts]
+ * @returns {object} safe metadata (never raw provider request material)
+ */
+function screenSafeMetadata(metadata = {}, { depth = 3, maxKeys = 50 } = {}) {
+  function walk(value, level) {
+    if (level > depth) return '[TRUNCATED]';
+    if (value === null || value === undefined) return null;
+    const type = typeof value;
+    if (type === 'string' || type === 'number' || type === 'boolean') {
+      if (
+        type === 'string' &&
+        /^(sk_|sk-live|sk-test|whsec_|rk_|pk_live|pk_test|AKIA|ghp_|eyJ[A-Za-z0-9_.-]{20,})/.test(value)
+      ) {
+        return '[REDACTED]';
+      }
+      return value;
+    }
+    if (type !== 'object') return null;
+    if (Array.isArray(value)) {
+      return value.slice(0, maxKeys).map((entry) => walk(entry, level + 1));
+    }
+    const out = {};
+    let count = 0;
+    for (const [key, val] of Object.entries(value)) {
+      if (count >= maxKeys) break;
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      const lower = String(key).toLowerCase();
+      const normalizedKey = lower.replace(/[^a-z0-9]/g, '');
+      if (SENSITIVE_METADATA_KEYS.has(lower) || SENSITIVE_METADATA_KEYS.has(normalizedKey)) {
+        out[key] = '[REDACTED]';
+        continue;
+      }
+      out[key] = walk(val, level + 1);
+      count += 1;
+    }
+    return out;
+  }
+  return walk(metadata, 0) || {};
+}
+
+/**
+ * Builds the canonical result for a provider operation (payment, payout,
+ * refund, or balance depending on `operation`). Never treats an unknown raw
+ * outcome as success and never echoes provider request material.
+ */
+function buildProviderResult({
+  operation,
+  provider,
+  rawStatus,
+  settlement = SETTLEMENT_STATE.UNKNOWN,
+  providerTransactionId = null,
+  providerReference = null,
+  amount = null,
+  currency = null,
+  fee = null,
+  safeMetadata = {},
+  error = null
+} = {}) {
+  const outcome = normalizeProviderOutcome(rawStatus);
+  const normalizedSettlement = SETTLEMENT_STATE_KEYS.includes(settlement) ? settlement : SETTLEMENT_STATE.UNKNOWN;
+  const reconciliationRequired =
+    outcome.state === RESULT_STATE.UNKNOWN ||
+    normalizedSettlement === SETTLEMENT_STATE.UNKNOWN;
+
+  return Object.freeze({
+    operation: String(operation || '').toLowerCase() || null,
+    provider: normalizeProviderKey(provider),
+    outcome: outcome.state,
+    matched_status: outcome.matched,
+    settlement: normalizedSettlement,
+    reconciliation_required: reconciliationRequired,
+    provider_transaction_id: providerTransactionId || null,
+    provider_reference: providerReference || null,
+    amount,
+    currency: currency ? String(currency).toUpperCase() : null,
+    fee: fee === undefined || fee === null ? null : fee,
+    safe_metadata: screenSafeMetadata(safeMetadata),
+    error: error ? categorizeProviderError(error) : null
+  });
+}
+
+/**
+ * Classifies an inbound provider event type into a canonical category.
+ *
+ * @param {string|undefined} eventType
+ * @returns {string} a WEBHOOK_EVENT_CATEGORY value
+ */
+function categorizeWebhookEventType(eventType) {
+  const raw = String(eventType || '').toLowerCase();
+  if (!raw) return WEBHOOK_EVENT_CATEGORY.UNKNOWN;
+  if (/\b(dispute|customer.dispute|case.id|case|resolution)\b/.test(raw)) {
+    return WEBHOOK_EVENT_CATEGORY.DISPUTE;
+  }
+  if (/\b(payment|capture|refund|payout|invoice|charge|transfer|authorization|settlement|billing|subscription|order)\b/.test(raw)) {
+    return WEBHOOK_EVENT_CATEGORY.FINANCIAL;
+  }
+  return WEBHOOK_EVENT_CATEGORY.ADMINISTRATIVE;
+}
+
+/**
+ * Builds the canonical shape for a verified, deduplicated webhook event.
+ * Financial events whose outcome is unknown are flagged for reconciliation.
+ */
+function normalizeWebhookEvent({
+  provider,
+  eventId,
+  eventType,
+  rawStatus,
+  safeMetadata = {},
+  receivedAt = new Date().toISOString()
+} = {}) {
+  const category = categorizeWebhookEventType(eventType);
+  const outcome = normalizeProviderOutcome(rawStatus);
+  const requiresReconciliation =
+    category === WEBHOOK_EVENT_CATEGORY.FINANCIAL &&
+    outcome.state === RESULT_STATE.UNKNOWN;
+
+  return Object.freeze({
+    provider: normalizeProviderKey(provider),
+    event_id: String(eventId || '').trim() || null,
+    event_type: String(eventType || '').trim() || null,
+    category,
+    received_at: receivedAt ? String(receivedAt) : null,
+    outcome: outcome.state,
+    matched_status: outcome.matched,
+    requires_reconciliation: requiresReconciliation,
+    safe_metadata: screenSafeMetadata(safeMetadata)
+  });
+}
+
 module.exports = {
   PROVIDER_OPERATION,
   PROVIDER_OPERATION_KEYS,
@@ -354,14 +780,30 @@ module.exports = {
   TRANSACTION_TYPE,
   TRANSACTION_TYPE_KEYS,
   OPERATION_BY_TRANSACTION_TYPE,
+  CANONICAL_OPERATION_METHODS,
+  RESULT_STATE,
+  RESULT_STATE_KEYS,
+  SETTLEMENT_STATE,
+  SETTLEMENT_STATE_KEYS,
+  PROVIDER_ERROR_CATEGORY,
+  PROVIDER_ERROR_CATEGORY_KEYS,
+  WEBHOOK_EVENT_CATEGORY,
+  WEBHOOK_EVENT_CATEGORY_KEYS,
   normalizeProviderKey,
   normalizeCountryCode,
   normalizeCurrencyCode,
   normalizePaymentMethod,
   normalizeTransactionType,
   normalizeExecutionStatus,
+  normalizeProviderOutcome,
+  categorizeProviderError,
+  screenSafeMetadata,
+  buildProviderResult,
+  categorizeWebhookEventType,
+  normalizeWebhookEvent,
   describeOperation,
   normalizeCapabilities,
   supportsCountry,
-  supportsCurrency
+  supportsCurrency,
+  buildProviderReadinessDescriptor
 };

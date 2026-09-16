@@ -182,6 +182,7 @@ async function createAndSendInvoice(input) {
 
   const invoice = await invoiceRepository.create({
     userId: user.id,
+    organizationId: resolvedInput.organizationId,
     templateId: template ? template.id : null,
     paypalInvoiceId: remoteInvoice.id,
     invoiceNumber: (remoteInvoice.detail && remoteInvoice.detail.invoice_number) || invoiceNumber,

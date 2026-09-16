@@ -4,6 +4,18 @@
 - Build and maintain Transferly across the API, Telegram bot, and Telegram Mini App.
 - Keep payment, ledger, webhook, and user-facing flows modular, auditable, and operationally safe.
 
+## Senior Engineering Operating Mode
+- Act as a senior engineering partner for this repository: inspect first, make the smallest correct change, and verify with evidence before claiming success.
+- Favor a focused diff, preserve established module ownership, and reuse existing patterns in the touched package before adding new abstraction.
+- Work effectively and accurately by tracing the relevant route, controller, service, repository, schema, job, webhook, and test path before editing.
+- When a task crosses payment, security, auth, or provider boundaries, widen verification to the next relevant guardrail instead of stopping at a single local check.
+- Prefer crisp, readable, maintainable code and explain tradeoffs briefly when a better design choice or risk is involved.
+
+## Compact Mode + Memory Discipline
+- Use compact mode deliberately when context grows: keep the working plan short, restate the current state in a few bullets, and rely on `/compact` when needed.
+- Remember the repository’s durable context and write useful notes into session or repository memory when they are likely to help future tasks, especially for workflow patterns, cross-package impacts, and verification evidence.
+- Treat memory as an operating aid, not a substitute for fresh verification: store lessons and plans, but rerun the proving command before reporting a result.
+
 ## Stack Constraints
 - `api/`: Node.js, CommonJS, Express, SQLite, Redis/BullMQ, Zod, Pino.
 - `bot/`: Node.js Telegram operations bot using grammY-style command/callback modules.
@@ -163,3 +175,21 @@ Apply these at all times — not only during explicit security reviews:
 ### Report
 - State the change, validation actually run, blocked checks with prerequisites, and remaining risks.
 - Never include secrets, tokens, webhook headers, or raw sensitive payloads in reports or logs.
+
+<!-- BUS:START -->
+## 🔴 LIVE BOARD — read this before you touch anything
+
+_Generated 2026-09-16T00:00Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
+
+**⚠️ 1 WARNING(S) — your next run may be affected:**
+- `emu37qfu6iap8` **copilot**: User operations now prompts for reason and confirmation before points adjustments and loads authoritative finance profiles; no general audit-log API exists, so no synthetic audit UI was added.
+
+**📌 CLAIMED RIGHT NOW (5) — do NOT edit these paths:**
+- **copilot**: path:miniapp/src/context/AppContext.jsx, path:miniapp/src/components/MiniAppShell.jsx, path:miniapp/src/lib/api.js, path:miniapp/test/organizationSwitcherContract.test.js — expires 00:22Z — Implementing Mini App organization context/switcher backed by authenticated organization APIs with personal-workspace fallback and contract tests.
+- **copilot**: path:api/db/migrations/202609150007_api_key_organizations.js, path:api/repositories/apiKeyRepository.js, path:api/services/apiKeyService.js, path:api/controllers/apiKeyController.js, path:api/middleware/authenticateRequest.js, path:api/middleware/resolveOrganizationContext.js, path:api/test/apiKeyOrganization.test.js — expires 00:29Z — Binding API keys to organization context with migration, auth propagation, and regression tests.
+- **copilot**: path:miniapp/src/components/OrganizationTeamSection.jsx, path:miniapp/src/lib/api.js, path:miniapp/src/components/MiniAppFinanceSuite.jsx, path:miniapp/test/organizationTeamContract.test.js — expires 00:32Z — Implementing Mini App organization team and invitation management UI with contract tests.
+- **copilot**: path:api/db/migrations/202609150008_financial_organization_ownership.js, path:api/repositories/invoiceRepository.js, path:api/repositories/payoutRepository.js, path:api/services/invoiceService.js, path:api/services/payoutService.js, path:api/test/tenantFinancialIsolation.test.js — expires 00:35Z — Auditing and adding organization ownership compatibility for invoice/payout resources with authorization tests.
+- **copilot**: path:api/db/migrations/202609150009_wallet_ledger_organization_ownership.js, path:api/repositories/walletRepository.js, path:api/repositories/ledgerRepository.js, path:api/repositories/transactionRepository.js, path:api/test/tenantWalletLedgerIsolation.test.js — expires 00:38Z — Auditing and adding organization ownership compatibility for wallets and ledger/transaction reads.
+
+Full board: use the `trc_team_read` tool, or run `agent-bus.mjs read --agent <you>`.
+<!-- BUS:END -->

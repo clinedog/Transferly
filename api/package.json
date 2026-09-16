@@ -15,6 +15,7 @@
     "db:seed": "node db/seed.js",
     "smoke:providers": "node scripts/providerSmoke.js",
     "smoke:readiness": "node scripts/deploymentReadinessSmoke.js",
+    "production:check": "node scripts/productionReadinessCheck.js",
     "verify:paypal:sandbox": "node scripts/paypalSandboxSmoke.js",
     "lint": "eslint .",
     "test": "node -r ./test/setup-test-env.js --test --test-concurrency=1"

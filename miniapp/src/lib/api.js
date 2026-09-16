@@ -7,6 +7,7 @@ const TOKEN_STORAGE_KEY = 'transferly_api_token';
 const ADMIN_TOKEN_STORAGE_KEY = 'transferly_admin_api_token';
 const LEGACY_TOKEN_STORAGE_KEY = 'slipcraft_api_token';
 const BOOTSTRAP_CACHE_KEY = 'transferly_bootstrap_cache_v1';
+const ORGANIZATION_PREFERENCE_KEY = 'transferly.selected-organization-id';
 const SAFE_RETRY_METHODS = new Set(['GET', 'HEAD']);
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 let lastApiFailure = null;
@@ -42,12 +43,25 @@ function buildUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
+function getSelectedOrganizationId() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  try {
+    return window.localStorage.getItem(ORGANIZATION_PREFERENCE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '' || value === 'ALL') {
       return;
     }
+
     search.set(key, String(value));
   });
   const query = search.toString();
@@ -330,6 +344,10 @@ export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
   headers.set('X-Transferly-Client', 'telegram-miniapp');
+  const selectedOrganizationId = getSelectedOrganizationId();
+  if (selectedOrganizationId && !headers.has('X-Organization-Id')) {
+    headers.set('X-Organization-Id', selectedOrganizationId);
+  }
 
   if (!headers.has('X-Request-Id')) {
     headers.set('X-Request-Id', createRequestId());
@@ -514,6 +532,96 @@ export function loginWithTelegramMiniApp({ initData, startParam }) {
   });
 }
 
+export function listMySessions() {
+  return apiRequest('/api/me/sessions');
+}
+
+export function revokeMySession(sessionId) {
+  return apiRequest(`/api/me/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function listMyApiKeys() {
+  return apiRequest('/api/me/api-keys');
+}
+
+export function createMyApiKey(payload) {
+  return apiRequest('/api/me/api-keys', {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function rotateMyApiKey(keyId) {
+  return apiRequest(`/api/me/api-keys/${encodeURIComponent(keyId)}/rotate`, {
+    method: 'POST',
+    body: {}
+  });
+}
+
+export function revokeMyApiKey(keyId) {
+  return apiRequest(`/api/me/api-keys/${encodeURIComponent(keyId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function listMyOrganizations() {
+  return apiRequest('/api/me/organizations');
+}
+
+export function createMyOrganization(payload) {
+  return apiRequest('/api/me/organizations', {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function getMyOrganizationContext(organizationId) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/context`);
+}
+
+export function listMyOrganizationMembers(organizationId) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/members`);
+}
+
+export function updateMyOrganizationMemberRole(organizationId, userId, role) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: { role }
+  });
+}
+
+export function removeMyOrganizationMember(organizationId, userId) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(userId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function listMyOrganizationInvitations(organizationId) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/invitations`);
+}
+
+export function createMyOrganizationInvitation(organizationId, payload) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/invitations`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function revokeMyOrganizationInvitation(organizationId, invitationId) {
+  return apiRequest(`/api/me/organizations/${encodeURIComponent(organizationId)}/invitations/${encodeURIComponent(invitationId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function acceptMyOrganizationInvitation(token) {
+  return apiRequest('/api/me/organization-invitations/accept', {
+    method: 'POST',
+    body: { token }
+  });
+}
+
 export function generateReceipt(payload) {
   return apiRequest('/api/receipt/generate', {
     method: 'POST',
@@ -655,6 +763,22 @@ export function listPaymentProviders() {
 
 export function listPaymentProviderHealth() {
   return apiRequest('/api/admin/payment-providers/health');
+}
+
+export function getAdminProductionReadiness() {
+  return apiRequest('/api/admin/production-readiness');
+}
+
+export function listAdminProviderIncidents() {
+  return apiRequest('/api/admin/provider-incidents');
+}
+
+export function listAdminAutomationHistory(params = {}) {
+  return apiRequest(`/api/admin/automation-history${buildQuery(params)}`);
+}
+
+export function getAdminSecurityOverview() {
+  return apiRequest('/api/admin/security-overview');
 }
 
 export function listPaymentProviderInvoiceFeatures() {
@@ -902,6 +1026,10 @@ export function adjustUserPoints(userId, delta, reason) {
 
 export function getAdminFinanceOverview() {
   return apiRequest('/api/admin/finance/overview');
+}
+
+export function listAdminAuditLogs(params = {}) {
+  return apiRequest(`/api/admin/audit-logs${buildQuery(params)}`);
 }
 
 export function listAdminFinanceTransactions(params = {}) {

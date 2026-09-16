@@ -224,10 +224,10 @@ test('database triggers reject invalid wallet and ledger bucket persistence', as
   await assert.rejects(
     () => db.run(
       `INSERT INTO ledger_entries (
-        id, entry_key, wallet_id, user_id, type, debit_bucket, credit_bucket, amount_cents,
+        id, entry_key, wallet_id, user_id, organization_id, type, debit_bucket, credit_bucket, amount_cents,
         currency_code, reference_type, reference_id, description, created_at
-      ) VALUES ('bad-ledger-entry', 'bad-ledger-entry', ?, ?, 'MANUAL_ADJUSTMENT', NULL, NULL, 0, 'USD', 'TEST', 'TEST', 'bad', ?)` ,
-      [wallet.id, 'ledger-trigger-user', new Date().toISOString()]
+      ) VALUES ('bad-ledger-entry', 'bad-ledger-entry', ?, ?, ?, 'MANUAL_ADJUSTMENT', NULL, NULL, 0, 'USD', 'TEST', 'TEST', 'bad', ?)` ,
+      [wallet.id, 'ledger-trigger-user', wallet.organizationId || 'personal:ledger-trigger-user', new Date().toISOString()]
     ),
     /ledger entry violates bucket invariants/
   );

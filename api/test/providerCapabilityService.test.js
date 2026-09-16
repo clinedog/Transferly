@@ -107,6 +107,14 @@ test('providerReadinessService summarizes provider operations and next steps saf
   assert.equal(readiness.display_name, 'Stripe');
   assert.equal(typeof readiness.ready, 'boolean');
   assert.ok(readiness.operations.some((operation) => operation.operation === 'balance'));
+  const balance = readiness.operations.find((operation) => operation.operation === 'balance');
+  assert.equal(balance.operation_status, 'live');
+  assert.equal(balance.execution_eligible.production, true);
+  assert.equal(readiness.credentials.configured, true);
+  assert.equal(typeof readiness.production_enabled, 'boolean');
+  assert.equal(typeof readiness.sandbox_enabled, 'boolean');
+  assert.ok(Array.isArray(readiness.countries));
+  assert.ok(Array.isArray(readiness.currencies));
   assert.ok(Array.isArray(readiness.lanes));
   assert.ok(Array.isArray(readiness.recommended_next_steps));
 
@@ -131,6 +139,7 @@ test('provider manifest lists enabled workspaces and disabled discovery modules 
   assert.equal(binance.enabled, false);
   assert.equal(binance.lifecycle, 'discovery-only');
   assert.equal(binance.navigation.visible, false);
+  assert.equal(binance.readiness.production_enabled, false);
   assert.equal(paypal.enabled, true);
   assert.equal(paypal.routes.dashboard, '/api/providers/paypal/dashboard');
   assert.equal(JSON.stringify(manifests).includes('sk_test_transferly'), false);
@@ -142,6 +151,9 @@ test('provider readiness report includes safe disabled-provider guidance', async
 
   assert.equal(report.length, 8);
   assert.equal(cashApp.readiness.status, 'disabled');
+  assert.equal(cashApp.readiness.enabled, false);
+  assert.equal(cashApp.readiness.production_enabled, false);
+  assert.ok(cashApp.readiness.operations.every((operation) => operation.execution_eligible.production === false));
   assert.equal(cashApp.health, null);
   assert.equal(cashApp.readiness.recommended_next_steps[0].code, 'COMPLETE_PROVIDER_INTEGRATION');
 });
@@ -154,6 +166,7 @@ test('providerStatusService summarizes status and preflights provider actions sa
   assert.equal(typeof status.ready, 'boolean');
   assert.equal(typeof status.health_score, 'number');
   assert.ok(status.operations.some((operation) => operation.operation === 'balance'));
+  assert.equal(status.operations.find((operation) => operation.operation === 'balance').execution_eligible.production, true);
   assert.ok(Array.isArray(status.next_actions));
 
   const allowed = await providerStatusService.preflightProviderAction('stripe', 'balance');

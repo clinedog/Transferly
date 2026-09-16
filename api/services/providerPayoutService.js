@@ -251,6 +251,7 @@ async function requestStripePayout(input) {
 
   const payout = await transaction(async (client) => {
     const created = await payoutRepository.create({
+      organizationId: input.organizationId,
       id: payoutId,
       userId: input.userId,
       idempotencyKey: input.idempotencyKey,

@@ -1,6 +1,7 @@
 const config = require('../config');
 const { buildRoleClaims, reconcileTelegramRole } = require('../core/auth/telegramAuthorization');
 const { authSessionRepository } = require('../repositories/authSessionRepository');
+const { apiKeyService } = require('../services/apiKeyService');
 const { profileRepository } = require('../repositories/profileRepository');
 const { userRepository } = require('../repositories/userRepository');
 const { USER_STATUS } = require('../utils/constants');
@@ -65,6 +66,27 @@ async function authenticateRequestAsync(request, _response, next) {
   request.auth = null;
 
   if (!token) {
+    next();
+    return;
+  }
+
+  if (token.startsWith('tl_live_')) {
+    const apiKey = await apiKeyService.authenticate(token);
+    if (!apiKey) {
+      next(new AppError(401, 'INVALID_API_TOKEN', 'Invalid API token.'));
+      return;
+    }
+    const user = await userRepository.findById(apiKey.userId);
+    assertActiveAccount(user);
+    request.auth = {
+      role: 'USER',
+      actorId: apiKey.userId,
+      userId: apiKey.userId,
+      apiKeyId: apiKey.id,
+      organizationId: apiKey.organizationId || null,
+      apiKeyScopes: apiKey.scopes,
+      method: 'api_key'
+    };
     next();
     return;
   }
@@ -174,6 +196,14 @@ function requireAuthenticatedUser(request, _response, next) {
   next();
 }
 
+function requireInteractiveSession(request, _response, next) {
+  if (!isAuthenticatedUser(request) || request.auth.method !== 'jwt') {
+    next(new AppError(401, 'SESSION_AUTH_REQUIRED', 'An interactive authentication session is required.'));
+    return;
+  }
+  next();
+}
+
 function isAuthenticatedUser(request) {
   const role = String(request.auth?.role || '').trim().toUpperCase();
   return Boolean(
@@ -212,6 +242,7 @@ function assertCanAccessUserResource(request, resourceUserId) {
 module.exports = {
   authenticateRequest,
   requireAuthenticatedUser,
+  requireInteractiveSession,
   resolveUserIdForRequest,
   assertCanAccessUserResource
 };

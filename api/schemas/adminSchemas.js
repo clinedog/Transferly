@@ -71,6 +71,15 @@ const adminFinanceTransactionsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(250).default(100)
 });
 
+const adminAuditLogsQuerySchema = z.object({
+  actorType: z.string().trim().min(1).max(80).optional(),
+  action: z.string().trim().min(1).max(160).optional(),
+  entityType: z.string().trim().min(1).max(80).optional(),
+  entityId: z.string().trim().min(1).max(160).optional(),
+  before: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(250).default(100)
+}).strict();
+
 const adminFinanceAlertsQuerySchema = z.object({
   status: z.enum(['OPEN', 'INVESTIGATING', 'RESOLVED', 'IGNORED_WITH_REASON']).optional(),
   userId: z.string().trim().min(1).optional(),
@@ -231,6 +240,27 @@ const paymentOpsIssueParamsSchema = z.object({
 const paymentOpsIssueActionSchema = z.object({
   note: z.string().trim().max(1000).optional()
 });
+
+const providerIncidentTransitionSchema = z.object({
+  status: z.enum(['INVESTIGATING', 'MITIGATED', 'RESOLVED', 'CLOSED'])
+}).strict();
+
+const providerIncidentParamsSchema = z.object({
+  id: z.string().trim().min(1)
+}).strict();
+
+const automationRuleCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  trigger: z.enum(['PAYMENT_SUCCEEDED', 'PAYMENT_FAILED', 'INVOICE_PAID', 'INVOICE_OVERDUE', 'PAYOUT_SUCCEEDED', 'PAYOUT_FAILED', 'TRANSACTION_UNKNOWN', 'PROVIDER_HEALTH_CHANGED']),
+  condition: z.object({ amount: z.number().nonnegative().optional() }).strict().default({}),
+  action: z.enum(['NOTIFY_ADMIN', 'NOTIFY_USER', 'CREATE_RECONCILIATION_TASK', 'SEND_RECEIPT'])
+}).strict();
+
+const automationRuleStatusSchema = z.object({ status: z.enum(['ACTIVE', 'PAUSED']) }).strict();
+const automationRuleDryRunSchema = z.object({
+  trigger: z.string().trim().min(1),
+  amount: z.number().nonnegative().optional()
+}).strict();
 
 const faqContentSchema = z.object({
   question: z.string().trim().min(1).max(500),
@@ -440,6 +470,7 @@ module.exports = {
   adminUserIdParamsSchema,
   faqContentSchema,
   adminFinanceAlertsQuerySchema,
+  adminAuditLogsQuerySchema,
   adminFinanceTransactionsQuerySchema,
   adminPaymentTransactionsQuerySchema,
   listInvoiceReminderConfigurationsQuerySchema,
@@ -448,6 +479,11 @@ module.exports = {
   listTopUpOrdersQuerySchema,
   paymentOpsIssueActionSchema,
   paymentOpsIssueParamsSchema,
+  providerIncidentParamsSchema,
+  providerIncidentTransitionSchema,
+  automationRuleCreateSchema,
+  automationRuleStatusSchema,
+  automationRuleDryRunSchema,
   releaseInvoiceFundsSchema,
   markInvoiceReviewRequiredSchema,
   stripeAccountLinkCreateSchema,

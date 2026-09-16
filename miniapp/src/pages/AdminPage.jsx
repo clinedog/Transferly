@@ -12,6 +12,12 @@ const AdminPaymentsTab = lazy(() => import('../components/AdminTabs/PaymentsTab'
 const AdminUsersTab = lazy(() => import('../components/AdminTabs/AdminUsersTab'));
 const AdminFinanceTab = lazy(() => import('../components/AdminTabs/AdminFinanceTab'));
 const AdminRiskTab = lazy(() => import('../components/AdminTabs/AdminRiskTab'));
+const AdminTransactionCenter = lazy(() => import('../components/AdminTabs/AdminTransactionCenter'));
+const AdminAuditLogTab = lazy(() => import('../components/AdminTabs/AdminAuditLogTab'));
+const AdminReadinessTab = lazy(() => import('../components/AdminTabs/AdminReadinessTab'));
+const AdminIncidentCenter = lazy(() => import('../components/AdminTabs/AdminIncidentCenter'));
+const AdminAutomationTab = lazy(() => import('../components/AdminTabs/AdminAutomationTab'));
+const AdminSecurityTab = lazy(() => import('../components/AdminTabs/AdminSecurityTab'));
 
 function AdminTabFallback() {
   return (
@@ -32,6 +38,12 @@ export default function AdminPage() {
     { id: 'faq', label: 'FAQ' },
     { id: 'content', label: 'Content Editor' },
     { id: 'finance', label: 'Finance' },
+    { id: 'transactions', label: 'Transactions' },
+    { id: 'audit', label: 'Audit Log' },
+    { id: 'readiness', label: 'Readiness' },
+    { id: 'incidents', label: 'Incidents' },
+    { id: 'automations', label: 'Automations' },
+    { id: 'security', label: 'Security' },
     { id: 'risk', label: 'Risk & Security' },
     { id: 'payments', label: 'PayPal Ops' },
     { id: 'users', label: 'Users' },
@@ -62,7 +74,7 @@ export default function AdminPage() {
     setActiveTab(tabId);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('tab', tabId);
-    if (!['payments', 'finance', 'risk'].includes(tabId)) {
+    if (!['payments', 'finance', 'risk', 'transactions', 'audit'].includes(tabId)) {
       nextParams.delete('section');
     }
     setSearchParams(nextParams);
@@ -118,6 +130,12 @@ export default function AdminPage() {
           {activeTab === 'faq' && <AdminFAQTab />}
           {activeTab === 'content' && <AdminContentTab />}
           {activeTab === 'finance' && <AdminFinanceTab />}
+          {activeTab === 'transactions' && <AdminTransactionCenter />}
+          {activeTab === 'audit' && <AdminAuditLogTab />}
+          {activeTab === 'readiness' && <AdminReadinessTab />}
+          {activeTab === 'incidents' && <AdminIncidentCenter />}
+          {activeTab === 'automations' && <AdminAutomationTab />}
+          {activeTab === 'security' && <AdminSecurityTab />}
           {activeTab === 'risk' && <AdminRiskTab />}
           {activeTab === 'payments' && <AdminPaymentsTab />}
           {activeTab === 'users' && <AdminUsersTab />}

@@ -33,6 +33,7 @@ import {
   sendInvoiceReminder
 } from '../lib/api';
 import { ConfirmationModal } from './ui/ConfirmationModal';
+import { SurfaceCard } from './ui';
 import {
   getProviderLaneDefinition,
   getProviderManifest,
@@ -550,7 +551,7 @@ function RecordList({ title, records = [], emptyTitle, emptyBody, renderRecord }
 
 function PayPalSection({ id, title, description, children }) {
   return (
-    <section id={id} className="rounded-[30px] border border-[#0070e0]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.075),rgba(255,255,255,0.035))] p-4 shadow-[0_18px_55px_rgba(0,48,135,0.16)] sm:p-5">
+    <SurfaceCard as="section" id={id} className="border-[#0070e0]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.075),rgba(255,255,255,0.035))] p-4 shadow-[0_18px_55px_rgba(0,48,135,0.16)] sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7fc4ff]">PayPal workspace</p>
@@ -559,18 +560,18 @@ function PayPalSection({ id, title, description, children }) {
         </div>
       </div>
       <div className="mt-4">{children}</div>
-    </section>
+    </SurfaceCard>
   );
 }
 
 function DataField({ label, value, mono = false }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
+    <SurfaceCard as="div" className="rounded-2xl bg-white/[0.045] p-3 shadow-none">
       <dt className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">{label}</dt>
       <dd className={`mt-1 break-words text-sm font-black text-[var(--tg-text-color)] ${mono ? 'font-mono text-xs' : ''}`}>
         {value || '—'}
       </dd>
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -623,11 +624,11 @@ function DisabledAction({ label, icon: Icon, reason }) {
 
 function EmptyPanel({ title, body, cta }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-[#0070e0]/25 bg-[#0070e0]/10 p-5 text-center">
+    <SurfaceCard as="div" className="border-dashed border-[#0070e0]/25 bg-[#0070e0]/10 p-5 text-center shadow-none">
       <p className="text-base font-black text-[var(--tg-text-color)]">{title}</p>
       <p className="mt-2 text-sm font-semibold leading-6 text-[var(--tg-subtitle-text-color)]">{body}</p>
       {cta ? <div className="mt-4"><PayPalButton primary>{cta}</PayPalButton></div> : null}
-    </div>
+    </SurfaceCard>
   );
 }
 

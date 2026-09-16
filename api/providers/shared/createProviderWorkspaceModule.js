@@ -1,3 +1,5 @@
+const { buildProviderReadinessDescriptor } = require('../../core/financial/providerContract');
+
 function createProviderWorkspaceModule({
   key,
   adapter,
@@ -20,15 +22,12 @@ function createProviderWorkspaceModule({
 
   function getReadiness() {
     const contract = getContract();
-    return {
+    return buildProviderReadinessDescriptor({
       provider: key,
-      status: contract.configured ? 'sandbox-ready' : 'needs-env',
-      configured: contract.configured,
-      mode: contract.mode,
-      required_env: contract.required_env,
-      missing_env: contract.missing_env,
-      operations: contract.operations
-    };
+      adapterContract: contract,
+      summary: adapter.getSummary(),
+      enabled: enabledByDefault
+    });
   }
 
   return Object.freeze({

@@ -7,7 +7,7 @@ export const DesignTokens = {
   // Typography
   typography: {
     fontFamily: {
-      sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      sans: "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       mono: "'JetBrains Mono', 'Fira Code', monospace",
     },
     fontSize: {
@@ -39,6 +39,26 @@ export const DesignTokens = {
       normal: '0',
       wide: '0.02em',
       wider: '0.16em',
+    },
+    // Named roles keep page-level typography consistent without coupling
+    // components to arbitrary Tailwind sizes.
+    roles: {
+      displayXl: { size: 'clamp(2.25rem, 9vw, 4rem)', lineHeight: 1.05, weight: 900 },
+      displayL: { size: 'clamp(2rem, 7vw, 3rem)', lineHeight: 1.1, weight: 900 },
+      displayM: { size: 'clamp(1.75rem, 6vw, 2.25rem)', lineHeight: 1.15, weight: 800 },
+      h1: { size: '1.875rem', lineHeight: 1.2, weight: 900 },
+      h2: { size: '1.5rem', lineHeight: 1.25, weight: 800 },
+      h3: { size: '1.25rem', lineHeight: 1.35, weight: 800 },
+      h4: { size: '1.125rem', lineHeight: 1.4, weight: 800 },
+      bodyLarge: { size: '1.125rem', lineHeight: 1.55, weight: 500 },
+      body: { size: '1rem', lineHeight: 1.5, weight: 500 },
+      bodySmall: { size: '0.875rem', lineHeight: 1.45, weight: 500 },
+      label: { size: '0.75rem', lineHeight: 1.3, weight: 800 },
+      caption: { size: '0.6875rem', lineHeight: 1.35, weight: 700 },
+      metadata: { size: '0.75rem', lineHeight: 1.35, weight: 700 },
+      button: { size: '0.875rem', lineHeight: 1.2, weight: 800 },
+      navigation: { size: '0.75rem', lineHeight: 1.2, weight: 800 },
+      financial: { size: 'clamp(1.75rem, 8vw, 2.75rem)', lineHeight: 1.05, weight: 900 },
     },
   },
 
@@ -84,6 +104,33 @@ export const DesignTokens = {
     'glass-hover': '0 28px 80px rgba(0,0,0,0.22)',
     card: '0 18px 50px rgba(15,23,42,0.06)',
     'card-hover': '0 24px 64px rgba(15,23,42,0.08)',
+  },
+
+  // Semantic surfaces and borders map to the Telegram-aware CSS variables.
+  surfaces: {
+    app: 'var(--miniapp-bg)',
+    shell: 'var(--miniapp-shell-bg)',
+    panel: 'var(--miniapp-panel-bg)',
+    card: 'var(--miniapp-card-surface)',
+    elevated: 'var(--miniapp-surface-elevated)',
+    border: 'var(--miniapp-border)',
+    divider: 'var(--miniapp-divider)',
+  },
+
+  // Dracula-inspired semantic palette. Components should consume semantic
+  // roles rather than hard-coding palette values.
+  dracula: {
+    background: '#282a36',
+    surface: '#44475a',
+    surfaceElevated: '#4d5064',
+    foreground: '#f8f8f2',
+    muted: '#6272a4',
+    primary: '#bd93f9',
+    accent: '#ff79c6',
+    success: '#50fa7b',
+    warning: '#f1fa8c',
+    danger: '#ff5555',
+    info: '#8be9fd',
   },
 
   // Transitions/Animation
@@ -166,6 +213,13 @@ export const StatusColors = {
     dot: 'bg-indigo-500',
     border: 'border-indigo-200 dark:border-indigo-800',
     icon: 'text-indigo-600 dark:text-indigo-400',
+  },
+  unknown: {
+    bg: 'bg-slate-100 dark:bg-slate-800/30',
+    text: 'text-slate-700 dark:text-slate-300',
+    dot: 'bg-slate-500',
+    border: 'border-slate-300 dark:border-slate-700',
+    icon: 'text-slate-600 dark:text-slate-400',
   },
   comingSoon: {
     bg: 'bg-purple-50 dark:bg-purple-900/20',

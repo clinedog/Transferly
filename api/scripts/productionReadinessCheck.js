@@ -36,6 +36,17 @@ const requiredFiles = [
   'api/services/pointLedgerService.js',
   'api/services/pointsFundingService.js',
   'api/repositories/idempotencyRepository.js',
+  'api/repositories/apiKeyRepository.js',
+  'api/services/apiKeyService.js',
+  'api/services/sessionManagementService.js',
+  'api/repositories/providerIncidentRepository.js',
+  'api/repositories/automationRuleRepository.js',
+  'api/services/automationRuleService.js',
+  'api/services/automationDispatchService.js',
+  'api/repositories/automationExecutionRepository.js',
+  'api/repositories/organizationRepository.js',
+  'api/services/organizationService.js',
+  'api/middleware/requireApiKeyScope.js',
   'api/jobs/worker.js',
 ];
 
@@ -84,6 +95,9 @@ addCheck('Health endpoint /health', kernelContent.includes("app.get('/health'") 
 addCheck('Health endpoint /api/health', kernelContent.includes("app.get('/api/health'") ? 'PASS' : 'FAIL', '/api/health route');
 addCheck('Health endpoint /api/v1/health', kernelContent.includes("app.get('/api/v1/health'") ? 'PASS' : 'FAIL', '/api/v1/health route');
 addCheck('Client health endpoint', kernelContent.includes("app.get('/api/health/client'") ? 'PASS' : 'FAIL', '/api/health/client route');
+addCheck('OpenAPI endpoint', kernelContent.includes("app.get('/api/v1/openapi.json'") ? 'PASS' : 'FAIL', '/api/v1/openapi.json route');
+addCheck('Organization context service', fs.existsSync(path.join(repoRoot, 'api/services/organizationContextService.js')) ? 'PASS' : 'WARN', 'individual workspace compatibility context');
+addCheck('Recovery readiness service', fs.existsSync(path.join(repoRoot, 'api/services/recoveryReadinessService.js')) ? 'PASS' : 'WARN', 'backup and restore evidence model');
 addCheck('Rate limiting middleware', kernelContent.includes('rateLimit') ? 'PASS' : 'FAIL', 'rateLimit');
 addCheck('Helmet security headers', kernelContent.includes('helmet()') ? 'PASS' : 'FAIL', 'helmet');
 addCheck('Request timeout middleware', kernelContent.includes('createRequestTimeoutMiddleware') ? 'PASS' : 'FAIL', 'request timeout');

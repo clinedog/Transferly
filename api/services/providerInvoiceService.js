@@ -335,6 +335,7 @@ async function createCryptoCharge(input, context) {
 
 async function persistProviderInvoice(input, context, providerResult) {
   const invoice = await invoiceRepository.create({
+    organizationId: input.organizationId,
     userId: context.user.id,
     templateId: context.template ? context.template.id : null,
     paypalInvoiceId: providerResult.providerInvoiceId,

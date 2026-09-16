@@ -39,6 +39,7 @@ export function PremiumButton({
       aria-disabled={disabled || isLoading ? 'true' : undefined}
       className={`
         miniapp-pressable miniapp-touch-target inline-flex items-center justify-center gap-2 rounded-full font-bold
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--miniapp-bg)]
         motion-safe:transition motion-safe:duration-300 motion-safe:ease-out
         disabled:opacity-50 disabled:cursor-not-allowed
         hover:shadow-md-glass disabled:active:scale-100

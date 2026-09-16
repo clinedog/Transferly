@@ -20,7 +20,6 @@ const { paymentOpsIssueRepository } = require('../repositories/paymentOpsIssueRe
 const { userRepository } = require('../repositories/userRepository');
 const { ledgerService } = require('../services/ledgerService');
 const { reconciliationTimelineService } = require('../services/reconciliationTimelineService');
-const { upsertPayoutDispositionIssue, resolvePayoutDispositionIssue, getPayoutDispositionIssue } = require('../services/payoutDispositionReconciliation');
 const { BALANCE_BUCKET, LEDGER_ENTRY_TYPE, PAYOUT_STATUS, RISK_DECISION } = require('../utils/constants');
 
 before(migrate);
@@ -81,20 +80,21 @@ async function updateStatus(payoutId, status) {
 }
 
 async function insertDisposition(payout, { type, amountCents = payout.amountCents, currencyCode = payout.currencyCode }) {
-  const wallet = await db.get('SELECT id FROM wallets WHERE user_id = ?', [payout.userId]);
+  const wallet = await db.get('SELECT id, organization_id FROM wallets WHERE user_id = ?', [payout.userId]);
   const buckets = type === LEDGER_ENTRY_TYPE.PAYOUT_SETTLED
     ? [BALANCE_BUCKET.FROZEN, BALANCE_BUCKET.PAID_OUT]
     : [BALANCE_BUCKET.FROZEN, BALANCE_BUCKET.AVAILABLE];
   await db.run(
     `INSERT INTO ledger_entries (
-       id, entry_key, wallet_id, user_id, type, debit_bucket, credit_bucket, amount_cents,
+       id, entry_key, wallet_id, user_id, organization_id, type, debit_bucket, credit_bucket, amount_cents,
        currency_code, reference_type, reference_id, description, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYOUT', ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYOUT', ?, ?, ?)`,
     [
       randomUUID(),
       `test-disposition:${payout.id}:${randomUUID()}`,
       wallet.id,
       payout.userId,
+      wallet.organization_id || `personal:${payout.userId}`,
       type,
       buckets[0],
       buckets[1],

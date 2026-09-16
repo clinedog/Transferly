@@ -24,6 +24,10 @@ function normalizeBalanceCents(fieldName, value) {
   return amount;
 }
 
+function resolveOrganizationId(userId, organizationId) {
+  return organizationId || `personal:${userId}`;
+}
+
 function mapWallet(row) {
   if (!row) {
     return null;
@@ -32,6 +36,7 @@ function mapWallet(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id || null,
     currencyCode: row.currency_code,
     pendingBalanceCents: row.pending_balance_cents,
     availableBalanceCents: row.available_balance_cents,
@@ -42,14 +47,32 @@ function mapWallet(row) {
   };
 }
 
-async function findByUserId(userId, client = db) {
-  const row = await client.get('SELECT * FROM wallets WHERE user_id = ?', [userId]);
+async function findByUserId(userId, client = db, organizationId = null) {
+  const effectiveOrganizationId = resolveOrganizationId(userId, organizationId);
+  const row = await client.get(
+    `
+      SELECT * FROM wallets
+      WHERE user_id = ?
+        AND (
+          organization_id = ?
+          OR (organization_id IS NULL AND ? = ?)
+        )
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [userId, effectiveOrganizationId, effectiveOrganizationId, `personal:${userId}`]
+  );
   return mapWallet(row);
 }
 
-async function getOrCreate(client, userId, currencyCode) {
-  const existing = await findByUserId(userId, client);
+async function getOrCreate(client, userId, currencyCode, organizationId = null) {
+  const effectiveOrganizationId = resolveOrganizationId(userId, organizationId);
+  const existing = await findByUserId(userId, client, effectiveOrganizationId);
   if (existing) {
+    if (!existing.organizationId) {
+      await client.run('UPDATE wallets SET organization_id = ? WHERE id = ?', [effectiveOrganizationId, existing.id]);
+      existing.organizationId = effectiveOrganizationId;
+    }
     return existing;
   }
 
@@ -57,14 +80,14 @@ async function getOrCreate(client, userId, currencyCode) {
   await client.run(
     `
       INSERT INTO wallets (
-        id, user_id, currency_code, pending_balance_cents, available_balance_cents,
+        id, user_id, organization_id, currency_code, pending_balance_cents, available_balance_cents,
         frozen_balance_cents, paid_out_balance_cents, created_at, updated_at
-      ) VALUES (?, ?, ?, 0, 0, 0, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?, ?)
     `,
-    [randomUUID(), userId, currencyCode, now, now]
+    [randomUUID(), userId, effectiveOrganizationId, currencyCode, now, now]
   );
 
-  return findByUserId(userId, client);
+  return findByUserId(userId, client, effectiveOrganizationId);
 }
 
 async function updateBalances(client, walletId, balances) {

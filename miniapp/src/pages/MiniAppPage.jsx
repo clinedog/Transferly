@@ -59,7 +59,7 @@ const SecuritySection = lazy(() => import('../components/MiniAppFinanceSuite').t
 
 // Loading fallbacks
 import LoadingFallback from '../components/ui/LoadingFallback';
-import { BottomSheet } from '../components/ui';
+import { BottomSheet, MiniAppPageContainer, SurfaceCard } from '../components/ui';
 
 // Prefetch helpers: dynamically import chunks on demand (hover or programmatic prefetch)
 let _financePrefetched = false;
@@ -500,24 +500,25 @@ function StatCard({ icon: Icon, label, value, tone = 'default' }) {
   };
 
   return (
-    <div className={`rounded-[24px] p-4 shadow-sm ${toneClasses[tone] || toneClasses.default}`}>
+    <SurfaceCard className={`p-4 ${toneClasses[tone] || toneClasses.default}`}>
       <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">
         <Icon size={15} />
         {label}
       </div>
       <p className="mt-3 text-2xl font-black tracking-[-0.04em] text-[var(--tg-text-color)]">{value}</p>
-    </div>
+    </SurfaceCard>
   );
 }
 
 function ActionCard({ icon: Icon, title, body, to, badge, accent = false }) {
   return (
-    <Link
+    <SurfaceCard
+      as={Link}
       to={to}
-      className={`group block rounded-[26px] p-5 shadow-sm transition active:scale-[0.99] ${
+      className={`group block p-5 miniapp-surface-card-interactive ${
         accent
           ? 'bg-[var(--tg-button-color)] text-[var(--tg-button-text-color)]'
-          : 'bg-[var(--tg-section-bg-color)] text-[var(--tg-text-color)]'
+          : 'text-[var(--tg-text-color)]'
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -544,7 +545,7 @@ function ActionCard({ icon: Icon, title, body, to, badge, accent = false }) {
         Open
         <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
       </div>
-    </Link>
+    </SurfaceCard>
   );
 }
 
@@ -866,9 +867,12 @@ function HeroPanel({ profile, telegram, receipts, topUpOrders }) {
             </div>
 
             <div className="mt-8">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Total Balance</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Transferly Points</p>
               <p className="mt-2 text-5xl font-black tracking-[-0.065em] text-white sm:text-6xl">
                 {balance.toLocaleString()} pts
+              </p>
+              <p className="mt-2 text-sm font-bold text-white/70">
+                Equivalent value: ₦{balance.toLocaleString()} <span className="text-white/50">· 1 point = ₦1</span>
               </p>
             </div>
 
@@ -1123,13 +1127,8 @@ function AllServicesGrid() {
 
 function ServiceCatalogTile({ service }) {
   const unavailable = !isServiceAvailable(service);
-
-  return (
-    <Link
-      to={getMiniAppServiceTarget(service)}
-      className="relative flex min-h-[112px] flex-col items-center justify-center rounded-[8px] border border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] p-3 text-center text-[var(--tg-text-color)] transition hover:bg-[var(--tg-section-bg-color)] active:scale-[0.98]"
-      aria-disabled={unavailable}
-    >
+  const content = (
+    <>
       {service.badge ? (
         <span className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] ${
           unavailable
@@ -1141,6 +1140,25 @@ function ServiceCatalogTile({ service }) {
       ) : null}
       <ServiceLogo service={service} size="md" className="mx-auto" />
       <span className="mt-3 line-clamp-2 min-h-[26px] w-full text-[11px] font-black leading-tight">{service.title}</span>
+      {unavailable ? (
+        <span className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">
+          Informational only
+        </span>
+      ) : null}
+    </>
+  );
+  const className = 'relative flex min-h-[112px] flex-col items-center justify-center rounded-[8px] border border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] p-3 text-center text-[var(--tg-text-color)] transition';
+
+  return unavailable ? (
+    <div className={`${className} cursor-not-allowed opacity-75`} aria-disabled="true">
+      {content}
+    </div>
+  ) : (
+    <Link
+      to={getMiniAppServiceTarget(service)}
+      className={`${className} hover:bg-[var(--tg-section-bg-color)] active:scale-[0.98]`}
+    >
+      {content}
     </Link>
   );
 }
@@ -1170,11 +1188,145 @@ function ScriptCatalogTile({ service }) {
 
 function ServicesSection() {
   const paypal = getServiceBySlug('paypal');
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [providerFilter, setProviderFilter] = useState('All');
+  const [operationFilter, setOperationFilter] = useState('All');
+  const [availabilityFilter, setAvailabilityFilter] = useState('All');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('All');
+  const [currencyFilter, setCurrencyFilter] = useState('All');
+  const normalizedQuery = query.trim().toLowerCase();
+  const categoryNames = ['All', ...miniAppServiceCategories.map((category) => category.title)];
+  const allServices = miniAppServiceCategories.flatMap((category) =>
+    category.slugs.map((slug) => getServiceBySlug(slug)).filter(Boolean)
+  );
+  const filterValues = (field) => [...new Set(allServices.flatMap((service) => {
+    const value = service?.[field];
+    return Array.isArray(value) ? value : value ? [value] : [];
+  }))].sort();
+  const providerOptions = filterValues('provider');
+  const operationOptions = filterValues('operations');
+  const paymentMethodOptions = filterValues('payment_methods');
+  const currencyOptions = filterValues('currencies');
+  const availabilityOptions = [...new Set(allServices.map((service) => getServiceStatusLabel(service)))].sort();
+  const matchesServiceFilters = (service, categoryTitle) => {
+    const provider = service?.provider || '';
+    const operations = Array.isArray(service?.operations) ? service.operations : [];
+    const paymentMethods = Array.isArray(service?.payment_methods) ? service.payment_methods : [];
+    const currencies = Array.isArray(service?.currencies) ? service.currencies : [];
+
+    return (
+      (activeCategory === 'All' || categoryTitle === activeCategory) &&
+      (!providerFilter || providerFilter === 'All' || provider === providerFilter) &&
+      (!operationFilter || operationFilter === 'All' || operations.includes(operationFilter)) &&
+      (!paymentMethodFilter || paymentMethodFilter === 'All' || paymentMethods.includes(paymentMethodFilter)) &&
+      (!currencyFilter || currencyFilter === 'All' || currencies.includes(currencyFilter)) &&
+      (!availabilityFilter || availabilityFilter === 'All' || getServiceStatusLabel(service) === availabilityFilter) &&
+      (!normalizedQuery || `${service.title} ${service.description} ${categoryTitle}`.toLowerCase().includes(normalizedQuery))
+    );
+  };
+  const filteredCategories = miniAppServiceCategories
+    .map((category) => ({
+      ...category,
+      services: category.slugs
+        .map((slug) => getServiceBySlug(slug))
+        .filter(Boolean)
+        .filter((service) => matchesServiceFilters(service, category.title))
+    }))
+    .filter((category) => category.services.length > 0);
 
   return (
     <div className="space-y-4">
       <section className="space-y-1">
         <h2 className="text-3xl font-black tracking-[-0.045em] text-[var(--tg-text-color)]">Services</h2>
+        <p className="max-w-2xl text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
+          Explore connected providers and Transferly tools. Coming-soon entries remain informational until their capability is live.
+        </p>
+      </section>
+
+      <section className="space-y-3" aria-label="Service discovery">
+        <label className="flex min-h-12 items-center gap-3 rounded-[22px] border border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] px-4">
+          <Search size={18} className="shrink-0 text-[var(--tg-hint-color)]" aria-hidden="true" />
+          <span className="sr-only">Search services</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search providers and tools"
+            className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[var(--tg-text-color)] outline-none placeholder:text-[var(--tg-hint-color)]"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="miniapp-touch-target flex h-8 w-8 items-center justify-center rounded-full text-[var(--tg-hint-color)] hover:bg-[var(--tg-section-bg-color)]"
+              aria-label="Clear service search"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </label>
+        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Service categories">
+          {categoryNames.map((category) => {
+            const active = category === activeCategory;
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setActiveCategory(category)}
+                className={`miniapp-touch-target shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${
+                  active
+                    ? 'border-[var(--tg-button-color)] bg-[var(--tg-button-color)] text-[var(--tg-button-text-color)]'
+                    : 'border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] text-[var(--tg-subtitle-text-color)] hover:text-[var(--tg-text-color)]'
+                }`}
+                aria-pressed={active}
+              >
+                {category}
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Service discovery filters">
+          <label className="text-xs font-black text-[var(--tg-hint-color)]">
+            Provider
+            <select aria-label="Filter services by provider" value={providerFilter} onChange={(event) => setProviderFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+              <option>All</option>
+              {providerOptions.map((value) => <option key={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-black text-[var(--tg-hint-color)]">
+            Operation
+            <select aria-label="Filter services by operation" value={operationFilter} onChange={(event) => setOperationFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+              <option>All</option>
+              {operationOptions.map((value) => <option key={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-black text-[var(--tg-hint-color)]">
+            Availability
+            <select aria-label="Filter services by availability" value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+              <option>All</option>
+              {availabilityOptions.map((value) => <option key={value}>{value}</option>)}
+            </select>
+          </label>
+          {paymentMethodOptions.length ? (
+            <label className="text-xs font-black text-[var(--tg-hint-color)]">
+              Payment method
+              <select aria-label="Filter services by payment method" value={paymentMethodFilter} onChange={(event) => setPaymentMethodFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+                <option>All</option>
+                {paymentMethodOptions.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </label>
+          ) : null}
+          {currencyOptions.length ? (
+            <label className="text-xs font-black text-[var(--tg-hint-color)]">
+              Currency
+              <select aria-label="Filter services by currency" value={currencyFilter} onChange={(event) => setCurrencyFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-[16px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+                <option>All</option>
+                {currencyOptions.map((value) => <option key={value}>{value}</option>)}
+              </select>
+            </label>
+          ) : null}
+        </div>
       </section>
 
       {paypal ? (
@@ -1199,12 +1351,7 @@ function ServicesSection() {
       <ProviderDock />
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        {miniAppServiceCategories.map((category) => {
-          const services = category.slugs.map((slug) => getServiceBySlug(slug)).filter(Boolean);
-          if (!services.length) {
-            return null;
-          }
-
+        {filteredCategories.map((category) => {
           return (
             <section key={category.title} className="rounded-[26px] bg-[var(--tg-section-bg-color)] p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -1219,7 +1366,7 @@ function ServicesSection() {
                 ) : null}
               </div>
               <div className={category.featured ? 'grid gap-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-3'}>
-                {services.map((service) => (
+                {category.services.map((service) => (
                   category.featured
                     ? <ScriptCatalogTile key={service.slug} service={service} />
                     : <ServiceCatalogTile key={service.slug} service={service} />
@@ -1229,6 +1376,25 @@ function ServicesSection() {
           );
         })}
       </div>
+      {!filteredCategories.length ? (
+        <div className="rounded-[26px] border border-dashed border-[var(--miniapp-border-color)] bg-[var(--tg-secondary-bg-color)] p-8 text-center">
+          <Search size={24} className="mx-auto text-[var(--tg-hint-color)]" aria-hidden="true" />
+          <h3 className="mt-3 text-base font-black text-[var(--tg-text-color)]">No services found</h3>
+          <p className="mt-1 text-sm font-semibold text-[var(--tg-hint-color)]">
+            Try another search or return to all categories.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              setActiveCategory('All');
+            }}
+            className="miniapp-touch-target mt-4 rounded-full bg-[var(--tg-button-color)] px-4 py-2 text-sm font-black text-[var(--tg-button-text-color)]"
+          >
+            Reset discovery
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3883,20 +4049,160 @@ function MiniAppServiceDetail({ slug, profile, config }) {
 
 function HomeSection({ profile, telegram, receipts, topUpOrders, paymentIssues, telegramAuthState, loading }) {
   return (
-    <div className="space-y-5">
+    <MiniAppPageContainer className="space-y-5">
       <HeroPanel profile={profile} telegram={telegram} receipts={receipts} topUpOrders={topUpOrders} />
+      <QuickActionsPanel />
       <WorkspaceStatusStrip
         telegram={telegram}
         telegramAuthState={telegramAuthState}
         loading={loading}
         paymentIssues={paymentIssues}
       />
+      <ProviderDock />
+      <RecentActivityPreview receipts={receipts} topUpOrders={topUpOrders} paymentIssues={paymentIssues} />
       <LaunchPath />
       <FeaturedStrip />
       <ServiceRail services={miniAppServiceHighlights} />
       <MarketplaceBoard />
       <AllServicesGrid />
-    </div>
+    </MiniAppPageContainer>
+  );
+}
+
+function QuickActionsPanel() {
+  const actions = [
+    {
+      label: 'Buy points',
+      description: 'Add funds to your Transferly wallet.',
+      to: '/miniapp/wallet',
+      icon: WalletCards,
+      tone: 'bg-[var(--tg-button-color)] text-[var(--tg-button-text-color)]'
+    },
+    {
+      label: 'Create invoice',
+      description: 'Start a provider-backed collection flow.',
+      to: '/miniapp/invoices',
+      icon: FileText,
+      tone: 'bg-[var(--miniapp-accent-soft)] text-[var(--tg-button-color)]'
+    },
+    {
+      label: 'Request payout',
+      description: 'Review payout readiness before submitting.',
+      to: '/miniapp/payouts',
+      icon: Send,
+      tone: 'bg-[var(--miniapp-accent-soft)] text-[var(--tg-button-color)]'
+    },
+    {
+      label: 'View activity',
+      description: 'Track payments, payouts, and receipts.',
+      to: '/miniapp/activity',
+      icon: Activity,
+      tone: 'bg-[var(--miniapp-accent-soft)] text-[var(--tg-button-color)]'
+    }
+  ];
+
+  return (
+    <section aria-labelledby="quick-actions-title" className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--miniapp-shell-text-muted)]">Shortcuts</p>
+          <h2 id="quick-actions-title" className="mt-1 text-xl font-black tracking-[-0.035em] text-[var(--miniapp-shell-text)]">
+            Quick actions
+          </h2>
+        </div>
+        <Link to="/miniapp/services" className="text-sm font-black text-[var(--tg-button-color)]">
+          Explore services
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.label}
+              to={action.to}
+              className="miniapp-pressable miniapp-card-surface group flex min-h-[124px] flex-col justify-between rounded-[var(--miniapp-radius-card)] border border-[var(--miniapp-border)] p-4 shadow-[var(--miniapp-shadow-card)]"
+            >
+              <span className={`flex h-10 w-10 items-center justify-center rounded-[var(--miniapp-radius-control)] ${action.tone}`}>
+                <Icon size={19} aria-hidden="true" />
+              </span>
+              <span className="mt-4">
+                <span className="block text-sm font-black text-[var(--miniapp-text-primary)]">{action.label}</span>
+                <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--miniapp-text-secondary)]">{action.description}</span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function RecentActivityPreview({ receipts, topUpOrders, paymentIssues }) {
+  const items = [
+    ...topUpOrders.map((order) => ({
+      id: `order-${order.id || order.order_id}`,
+      title: 'Points funding',
+      detail: order.status ? String(order.status).replace(/_/g, ' ') : 'Funding request',
+      status: order.status || 'PENDING',
+      timestamp: order.updated_at || order.created_at
+    })),
+    ...receipts.map((receipt) => ({
+      id: `receipt-${receipt.id}`,
+      title: receipt.title || 'Receipt generated',
+      detail: receipt.provider || 'Transferly receipt',
+      status: 'COMPLETED',
+      timestamp: receipt.created_at
+    })),
+    ...paymentIssues.map((issue) => ({
+      id: `issue-${issue.id || issue.provider}`,
+      title: issue.title || 'Payment issue',
+      detail: issue.provider || 'Provider review required',
+      status: issue.status || 'UNKNOWN',
+      timestamp: issue.updated_at || issue.created_at
+    }))
+  ]
+    .sort((left, right) => new Date(right.timestamp || 0).getTime() - new Date(left.timestamp || 0).getTime())
+    .slice(0, 4);
+
+  return (
+    <section className="space-y-3" aria-labelledby="recent-activity-title">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--miniapp-shell-text-muted)]">Financial timeline</p>
+          <h2 id="recent-activity-title" className="mt-1 text-xl font-black tracking-[-0.035em] text-[var(--miniapp-shell-text)]">
+            Recent activity
+          </h2>
+        </div>
+        <Link to="/miniapp/activity" className="text-sm font-black text-[var(--tg-button-color)]">
+          View all
+        </Link>
+      </div>
+      <SurfaceCard as="div" className="overflow-hidden">
+        {items.length ? items.map((item, index) => (
+          <div
+            key={item.id}
+            className={`flex items-center gap-3 px-4 py-3.5 ${index ? 'border-t border-[var(--miniapp-border)]' : ''}`}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--miniapp-accent-soft)] text-xs font-black text-[var(--tg-button-color)]">
+              {item.title.slice(0, 1).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-black text-[var(--miniapp-text-primary)]">{item.title}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold capitalize text-[var(--miniapp-text-secondary)]">{item.detail}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-[var(--miniapp-panel-bg)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--miniapp-text-secondary)]">
+              {String(item.status).replace(/_/g, ' ')}
+            </span>
+          </div>
+        )) : (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm font-black text-[var(--miniapp-text-primary)]">No activity yet</p>
+            <p className="mt-1 text-xs font-semibold text-[var(--miniapp-text-secondary)]">Completed funding, receipts, and provider events will appear here.</p>
+          </div>
+        )}
+      </SurfaceCard>
+    </section>
   );
 }
 

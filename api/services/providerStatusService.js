@@ -24,8 +24,13 @@ function summarizeOperations(readiness = {}) {
       operation,
       label: OPERATION_LABELS[operation] || operation,
       status,
+      operation_status: item.operation_status || status,
       implemented: Boolean(item.implemented || isProviderOperationImplemented(status)),
-      actionable: Boolean(item.actionable || !isProviderOperationImplemented(status))
+      actionable: Boolean(item.actionable),
+      execution_eligible: item.execution_eligible || { production: false, sandbox: false },
+      production_enabled: Boolean(item.production_enabled),
+      sandbox_enabled: Boolean(item.sandbox_enabled),
+      reason: item.reason || null
     };
   });
 }

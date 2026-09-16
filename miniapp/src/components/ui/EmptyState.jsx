@@ -11,6 +11,7 @@ import { cn } from './DesignTokens';
 export function EmptyState({
   title,
   description,
+  body,
   icon: Icon = Inbox,
   action,
   actionLabel,
@@ -39,7 +40,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 active:scale-[0.99]"
+          className="miniapp-touch-target miniapp-pressable mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--tg-button-color)] px-5 text-sm font-black text-[var(--tg-button-text-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)]"
         >
           {action.label}
           <ArrowRight size={14} />
@@ -51,7 +52,7 @@ export function EmptyState({
       return (
         <Link
           to={actionTo}
-          className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+          className="miniapp-touch-target miniapp-pressable mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--tg-button-color)] px-5 text-sm font-black text-[var(--tg-button-text-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)]"
         >
           {actionLabel}
           <ArrowRight size={14} />
@@ -62,7 +63,7 @@ export function EmptyState({
     return (
       <a
         href={actionHref}
-        className="mt-4 inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+        className="miniapp-touch-target miniapp-pressable mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--tg-button-color)] px-5 text-sm font-black text-[var(--tg-button-text-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)]"
       >
         {actionLabel}
         <ArrowRight size={14} />
@@ -72,22 +73,22 @@ export function EmptyState({
 
   return (
     <div className={cn(
-      'flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 text-center',
+      'flex flex-col items-center justify-center rounded-[var(--miniapp-radius-card)] border border-dashed border-[var(--miniapp-border)] bg-[var(--miniapp-panel-bg)] text-center',
       sizeClasses[size],
       className
     )}>
       <div className={cn(
-        'flex items-center justify-center rounded-2xl bg-slate-100 text-slate-400',
+        'flex items-center justify-center rounded-2xl bg-[var(--miniapp-accent-soft)] text-[var(--miniapp-text-muted)]',
         iconSizeClasses[size]
       )}>
         <Icon size={size === 'lg' ? 32 : 24} aria-hidden="true" />
       </div>
-      <h3 className="mt-4 text-base font-black text-slate-900 md:text-lg">
+      <h3 className="mt-4 text-base font-black text-[var(--miniapp-text-primary)] md:text-lg">
         {title}
       </h3>
-      {description ? (
-        <p className="mt-1 max-w-sm text-sm font-semibold text-slate-500">
-          {description}
+      {description || body ? (
+        <p className="mt-1 max-w-sm text-sm font-semibold text-[var(--miniapp-text-secondary)]">
+          {description || body}
         </p>
       ) : null}
       {renderAction()}

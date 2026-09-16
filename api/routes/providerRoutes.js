@@ -38,11 +38,13 @@ const {
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { requireAuthenticatedUser } = require('../middleware/authenticateRequest');
 const { requireIdempotencyKey } = require('../middleware/requireIdempotencyKey');
+const { requireApiKeyScope } = require('../middleware/requireApiKeyScope');
 const { AppError } = require('../utils/errors');
 
 const router = express.Router();
 
 router.use(requireAuthenticatedUser);
+router.use(requireApiKeyScope('providers'));
 router.get('/', asyncHandler(listProvidersController));
 router.get('/readiness', asyncHandler(listProviderReadinessController));
 router.get('/routing', asyncHandler(getProviderRoutingController));

@@ -168,8 +168,6 @@ async function ensurePayoutDispositionIssue(payoutId, client = db) {
       client
     );
     if (existing && existing.status === 'OPEN') {
-      
-  const payout = await payoutRepository.findById(payoutId, client)
       return paymentOpsIssueRepository.updateById(existing.id, {
         status: 'RESOLVED',
         resolvedAt: new Date().toISOString(),
@@ -223,8 +221,7 @@ function buildAlertId(mismatch) {
 }
 
 async function persistReconciliationAlerts(mismatches) {
-  
-  const payout = await payoutRepository.findById(payoutId, client)
+  const now = new Date().toISOString();
   const alerts = [];
 
   for (const mismatch of mismatches) {

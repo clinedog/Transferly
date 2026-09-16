@@ -3,12 +3,38 @@ const { providerManifestService } = require('./providerManifestService');
 const { providerReadinessService } = require('./providerReadinessService');
 
 function disabledReadiness(manifest) {
+  const descriptor = manifest.readiness || {};
+  const operations = Object.values(descriptor.operations || {}).map((operation) => ({
+    operation: operation.operation,
+    status: 'disabled',
+    operation_status: operation.operationStatus === 'unsupported' ? 'unsupported' : 'disabled',
+    execution_eligible: { production: false, sandbox: false, requestedEnvironment: descriptor.environment || null, eligibleForRequestedEnvironment: false },
+    production_enabled: false,
+    sandbox_enabled: false,
+    reason: 'This discovery-only provider is disabled and cannot execute provider operations.'
+  }));
+
   return {
     provider: manifest.key,
     display_name: manifest.display_name,
     status: 'disabled',
     ready: false,
-    missing_env: manifest.configuration.missing_env,
+    environment: descriptor.environment || null,
+    enabled: false,
+    production_enabled: false,
+    sandbox_enabled: false,
+    configuration: {
+      configured: Boolean(manifest.configuration.configured),
+      required: manifest.configuration.required_env || [],
+      missing: manifest.configuration.missing_env || []
+    },
+    credentials: {
+      configured: Boolean(manifest.configuration.configured),
+      required: manifest.configuration.required_env || [],
+      missing: manifest.configuration.missing_env || []
+    },
+    missing_env: manifest.configuration.missing_env || [],
+    operations,
     summary: {
       live_operations: 0,
       setup_operations: 0,

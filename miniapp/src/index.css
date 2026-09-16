@@ -1,11 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * {
-  @apply font-sans;
+  font-family: var(--miniapp-font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--miniapp-font-display);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 html {
@@ -47,6 +64,27 @@ html {
   --miniapp-bottom-content-padding: calc(
     var(--miniapp-bottom-nav-height) + var(--miniapp-bottom-nav-gap) + var(--miniapp-safe-area-bottom) + 28px
   );
+  --miniapp-radius-card: 1.5rem;
+  --miniapp-radius-control: 0.875rem;
+  --miniapp-shadow-card: 0 18px 50px color-mix(in srgb, #020817 18%, transparent);
+  --miniapp-shadow-focus: 0 0 0 3px var(--miniapp-focus-ring);
+  --miniapp-type-display-xl: clamp(2.25rem, 9vw, 4rem);
+  --miniapp-type-display-l: clamp(2rem, 7vw, 3rem);
+  --miniapp-type-display-m: clamp(1.75rem, 6vw, 2.25rem);
+  --miniapp-type-financial: clamp(1.75rem, 8vw, 2.75rem);
+  --miniapp-font-body: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --miniapp-font-display: 'Space Grotesk', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --dracula-background: #282a36;
+  --dracula-surface: #44475a;
+  --dracula-surface-elevated: #4d5064;
+  --dracula-foreground: #f8f8f2;
+  --dracula-muted: #6272a4;
+  --dracula-primary: #bd93f9;
+  --dracula-accent: #ff79c6;
+  --dracula-success: #50fa7b;
+  --dracula-warning: #f1fa8c;
+  --dracula-danger: #ff5555;
+  --dracula-info: #8be9fd;
 }
 
 @supports (bottom: max(0px)) {
@@ -130,6 +168,38 @@ body {
   color-scheme: dark;
   background:
     linear-gradient(180deg, var(--miniapp-shell-bg) 0%, color-mix(in srgb, var(--tg-bg-color, #0b1524) 92%, #020817 8%) 58%, #07111d 100%);
+}
+
+.miniapp-type-display-xl,
+.miniapp-type-display-l,
+.miniapp-type-display-m,
+.miniapp-type-financial {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.miniapp-type-display-xl {
+  font-size: var(--miniapp-type-display-xl);
+  line-height: 1.05;
+  font-weight: 900;
+}
+
+.miniapp-type-display-l {
+  font-size: var(--miniapp-type-display-l);
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.miniapp-type-display-m {
+  font-size: var(--miniapp-type-display-m);
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.miniapp-type-financial {
+  font-size: var(--miniapp-type-financial);
+  line-height: 1.05;
+  font-weight: 900;
 }
 
 .transferly-miniapp-skin-light {
@@ -336,6 +406,102 @@ button:disabled,
 
 .miniapp-pressable:active {
   transform: translateY(1px) scale(0.985);
+}
+
+.miniapp-card-surface {
+  background: var(--miniapp-card-surface);
+  color: var(--miniapp-text-primary);
+}
+
+.miniapp-page-container {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: max(var(--miniapp-shell-inline-padding), var(--miniapp-safe-area-left))
+    max(var(--miniapp-shell-inline-padding), var(--miniapp-safe-area-right));
+  padding-bottom: var(--miniapp-bottom-content-padding);
+}
+
+.miniapp-surface-card {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--miniapp-border, color-mix(in srgb, var(--dracula-foreground) 12%, transparent));
+  border-radius: var(--miniapp-radius-card);
+  background: var(--miniapp-card-surface, var(--dracula-surface));
+  color: var(--miniapp-text-primary, var(--dracula-foreground));
+  box-shadow: var(--miniapp-shadow-card);
+}
+
+.miniapp-surface-card-interactive {
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.miniapp-surface-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--miniapp-shadow-card), 0 0 0 1px var(--miniapp-accent-border);
+}
+
+.miniapp-surface-card-interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--miniapp-shadow-focus);
+}
+
+.miniapp-bg {
+  background: var(--dracula-background);
+}
+
+.miniapp-surface {
+  background: var(--dracula-surface);
+}
+
+.miniapp-surface-elevated {
+  background: var(--dracula-surface-elevated);
+}
+
+.miniapp-text {
+  color: var(--dracula-foreground);
+}
+
+.miniapp-text-muted {
+  color: var(--dracula-muted);
+}
+
+.miniapp-accent {
+  color: var(--dracula-primary);
+}
+
+.miniapp-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.miniapp-skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 200;
+  transform: translateY(-200%);
+  border-radius: 9999px;
+  background: var(--tg-button-color);
+  color: var(--tg-button-text-color);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: var(--miniapp-shadow-card);
+  transition: transform 180ms ease;
+}
+
+.miniapp-skip-link:focus {
+  transform: translateY(0);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--miniapp-shadow-focus);
 }
 
 .miniapp-elevated-surface {

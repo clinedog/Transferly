@@ -45,6 +45,8 @@ import {
   listPaymentOpsIssues as listPaymentOpsIssuesRequest,
   listPaymentProviderHealth as listPaymentProviderHealthRequest,
   listPaymentProviders as listPaymentProvidersRequest,
+  listMyOrganizations,
+  getMyOrganizationContext,
   listProviderCapabilities as listProviderCapabilitiesRequest,
   markAdminInvoiceReviewRequired as markAdminInvoiceReviewRequiredRequest,
   ignoreAdminWebhookEvent as ignoreAdminWebhookEventRequest,
@@ -362,6 +364,28 @@ function mapProfile(profileData, pointsData, referralData, userData) {
   };
 }
 
+function mapOrganizationContext(context) {
+  if (!context?.organization) {
+    return null;
+  }
+
+  return {
+    mode: context.mode || 'individual',
+    organization: context.organization,
+    permissions: Array.isArray(context.permissions) ? context.permissions : [],
+    tenantIsolation: context.tenantIsolation || null
+  };
+}
+
+const ORGANIZATION_PREFERENCE_KEY = 'transferly.selected-organization-id';
+
+function readSelectedOrganizationId() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  return window.localStorage.getItem(ORGANIZATION_PREFERENCE_KEY) || '';
+}
+
 function sortByOrderIndex(items = []) {
   return [...items].sort((left, right) => {
     const orderDelta = Number(left?.order_index ?? 0) - Number(right?.order_index ?? 0);
@@ -449,6 +473,9 @@ export function AppContextProvider({ children }) {
   const authStateManager = getAuthStateManager();
   const [user, setUserState] = useState(null);
   const [profile, setProfileState] = useState(null);
+  const [organizationContext, setOrganizationContextState] = useState(null);
+  const [organizations, setOrganizationsState] = useState([]);
+  const [organizationError, setOrganizationError] = useState(null);
   const [config, setConfigState] = useState(defaultConfig);
   const [receipts, setReceiptsState] = useState([]);
   const [faqs, setFaqsState] = useState([]);
@@ -536,6 +563,9 @@ export function AppContextProvider({ children }) {
       setPayoutPaginationState(null);
       setFinanceSummaryState(null);
       setCommandCenterState(null);
+        setOrganizationContextState(null);
+      setOrganizationsState([]);
+      setOrganizationError(null);
       setInitializationError(null);
       setLastSyncedAt(null);
       setTopUpOrdersState([]);
@@ -571,6 +601,7 @@ export function AppContextProvider({ children }) {
     setPayoutPaginationState(nextPayouts.pagination);
     setFinanceSummaryState(snapshot.financeSummary || null);
     setCommandCenterState(snapshot.commandCenter || null);
+    setOrganizationContextState(mapOrganizationContext(snapshot.organizationContext));
     setInitializationError(null);
     setLastSyncedAt(new Date().toISOString());
     setTopUpOrdersState(nextTopUpOrders);
@@ -587,6 +618,44 @@ export function AppContextProvider({ children }) {
       topUpOrders: nextTopUpOrders
     };
   }, [readCollectionSnapshot]);
+
+  const refreshOrganizations = useCallback(async () => {
+    if (authState?.state !== AUTH_STATES.AUTHENTICATED) {
+      setOrganizationsState([]);
+      return [];
+    }
+    try {
+      const payload = await listMyOrganizations();
+      const nextOrganizations = Array.isArray(payload?.data) ? payload.data : [];
+      setOrganizationsState(nextOrganizations);
+      setOrganizationError(null);
+      if (!organizationContext?.organization?.id && nextOrganizations[0]?.id) {
+        const preferredId = readSelectedOrganizationId();
+        const selectedOrganization = nextOrganizations.find((organization) => organization.id === preferredId)
+          || nextOrganizations[0];
+        const contextPayload = await getMyOrganizationContext(selectedOrganization.id);
+        setOrganizationContextState(mapOrganizationContext(contextPayload?.data));
+      }
+      return nextOrganizations;
+    } catch (error) {
+      setOrganizationError(error?.message || 'Unable to load organizations.');
+      return [];
+    }
+  }, [authState?.state, organizationContext?.organization?.id]);
+
+  const switchOrganization = useCallback(async (organizationId) => {
+    const payload = await getMyOrganizationContext(organizationId);
+    const nextContext = mapOrganizationContext(payload?.data);
+    setOrganizationContextState(nextContext);
+    if (typeof window !== 'undefined' && nextContext?.organization?.id) {
+      window.localStorage.setItem(ORGANIZATION_PREFERENCE_KEY, nextContext.organization.id);
+    }
+    return nextContext;
+  }, []);
+
+  useEffect(() => {
+    refreshOrganizations();
+  }, [refreshOrganizations]);
 
   const fetchConfig = useCallback(async () => {
     const payload = await getBootstrap();
@@ -1978,6 +2047,11 @@ export function AppContextProvider({ children }) {
     payoutPagination,
     financeSummary,
     commandCenter,
+    organizationContext,
+    organizations,
+    organizationError,
+    refreshOrganizations,
+    switchOrganization,
     initializationError,
     lastSyncedAt,
     clientHealth,

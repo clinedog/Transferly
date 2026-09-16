@@ -5,6 +5,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import ServiceLogo from '../components/ServiceLogo';
 import { getServiceBySlug, getServicesByGroup, serviceGroups } from '../lib/servicesCatalog';
+import { MiniAppPageContainer, SurfaceCard } from '../components/ui';
 
 function Badge({ children, tone = 'slate' }) {
   const tones = {
@@ -44,7 +45,7 @@ export default function ServicesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 px-4 py-5 md:px-8 md:py-8">
+      <MiniAppPageContainer className="space-y-8 py-5 md:py-8">
         <section className="space-y-5">
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 md:text-4xl">Services</h1>
@@ -58,9 +59,10 @@ export default function ServicesPage() {
           </div>
 
           {aiReply ? (
-            <Link
+            <SurfaceCard as={Link}
+              interactive
               to={`/services/${aiReply.slug}`}
-              className="group flex items-center justify-between gap-5 rounded-[28px] bg-[#121212] p-6 text-white shadow-[0_28px_80px_rgba(15,23,42,0.24)] transition hover:translate-y-[-1px]"
+              className="group flex items-center justify-between gap-5 bg-[#121212] p-6 text-white shadow-[0_28px_80px_rgba(15,23,42,0.24)] transition hover:translate-y-[-1px]"
             >
               <div className="flex items-start gap-4">
                 <ServiceLogo service={aiReply} size="lg" />
@@ -75,7 +77,7 @@ export default function ServicesPage() {
                 </div>
               </div>
               <ArrowRight size={20} className="shrink-0 text-white/45 transition group-hover:translate-x-1 group-hover:text-white" />
-            </Link>
+            </SurfaceCard>
           ) : null}
         </section>
 
@@ -84,9 +86,9 @@ export default function ServicesPage() {
             const services = getServicesByGroup(group);
 
             return (
-              <section
+              <SurfaceCard as="section"
                 key={group.title}
-                className="rounded-[26px] border border-[#ece7dd] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
+                className="p-6"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-3">
@@ -117,12 +119,12 @@ export default function ServicesPage() {
                     </Link>
                   ))}
                 </div>
-              </section>
+              </SurfaceCard>
             );
           })}
 
           {scriptService ? (
-            <section className="rounded-[26px] border border-[#ece7dd] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+            <SurfaceCard as="section" className="p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
@@ -136,9 +138,10 @@ export default function ServicesPage() {
                 </Link>
               </div>
 
-              <Link
+              <SurfaceCard as={Link}
+                interactive
                 to={`/services/${scriptService.slug}`}
-                className="mt-5 grid gap-5 rounded-[24px] border border-[#ece7dd] bg-[#f8f7f3] p-5 transition hover:border-orange-200 hover:bg-orange-50/50 md:grid-cols-[220px_minmax(0,1fr)]"
+                className="mt-5 grid gap-5 bg-[var(--miniapp-panel-bg)] p-5 transition hover:border-orange-200 hover:bg-orange-50/50 md:grid-cols-[220px_minmax(0,1fr)]"
               >
                 <div className="flex min-h-[160px] items-center justify-center rounded-[22px] bg-[#121212] p-6">
                   <ServiceLogo service={scriptService} size="lg" />
@@ -161,11 +164,11 @@ export default function ServicesPage() {
                     </span>
                   </div>
                 </div>
-              </Link>
-            </section>
+              </SurfaceCard>
+            </SurfaceCard>
           ) : null}
         </div>
-      </div>
+      </MiniAppPageContainer>
     </DashboardLayout>
   );
 }

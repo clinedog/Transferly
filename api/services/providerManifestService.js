@@ -1,4 +1,5 @@
 const { getProviderWorkspace, getProviderLanes } = require('../constants/providerWorkspaceContract');
+const { buildProviderReadinessDescriptor } = require('../core/financial/providerContract');
 const { providerModuleRegistry } = require('../providers/moduleRegistry');
 
 function buildRoutes(provider) {
@@ -23,6 +24,12 @@ function presentProviderManifest(module) {
   const workspace = getProviderWorkspace(module.key);
   const adapter = module.adapter.getSummary();
   const enabled = providerModuleRegistry.isEnabled(module.key);
+  const readiness = buildProviderReadinessDescriptor({
+    provider: module.key,
+    adapterContract: module.adapter.getAdapterContract(),
+    summary: adapter,
+    enabled
+  });
 
   return {
     key: module.key,
@@ -37,8 +44,15 @@ function presentProviderManifest(module) {
     },
     configuration: {
       status: adapter.status,
-      required_env: adapter.required_env,
-      missing_env: adapter.missing_env
+      configured: readiness.configured,
+      required_env: readiness.requiredConfiguration,
+      missing_env: readiness.missingConfiguration
+    },
+    readiness: {
+      environment: readiness.environment,
+      production_enabled: readiness.productionEnabled,
+      sandbox_enabled: readiness.sandboxEnabled,
+      operations: readiness.operations
     },
     capabilities: adapter.capabilities || {},
     routes: buildRoutes(module.key),

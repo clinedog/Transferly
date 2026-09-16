@@ -15,6 +15,8 @@ const CORS_ALLOWED_HEADERS = Object.freeze([
   'idempotency-key',
   'x-admin-token',
   'x-request-id',
+  'x-correlation-id',
+  'x-organization-id',
   'x-transferly-client',
   'x-api-signature',
   'x-api-timestamp',

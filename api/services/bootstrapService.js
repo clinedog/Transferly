@@ -19,6 +19,7 @@ const { ledgerService } = require('./ledgerService');
 const { referralService } = require('./referralService');
 const { slipcraftReceiptService } = require('./slipcraftReceiptService');
 const { slipcraftUserService } = require('./slipcraftUserService');
+const { organizationContextService } = require('./organizationContextService');
 
 async function ensureDemoAccount(input = {}) {
   const seed = {
@@ -372,6 +373,7 @@ async function getCurrentUserSnapshot(userId) {
   return {
     user,
     profile,
+    organizationContext: organizationContextService.buildContext({ user, profile }),
     points,
     receipts,
     referrals,

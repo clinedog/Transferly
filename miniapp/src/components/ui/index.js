@@ -14,3 +14,5 @@ export { BalanceCard } from './BalanceCard';
 export { StatGrid } from './StatGrid';
 export { PremiumButton } from './PremiumButton';
 export { TransactionItem } from './TransactionItem';
+export { SurfaceCard } from './SurfaceCard';
+export { MiniAppPageContainer } from './MiniAppPageContainer';

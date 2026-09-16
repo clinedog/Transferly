@@ -104,12 +104,12 @@ export function MiniAppState({
       className={`flex w-full items-center justify-center px-5 text-center ${compact ? 'min-h-[240px]' : 'min-h-screen bg-[var(--tg-bg-color,#0b1524)]'}`}
     >
       <section
-        className="flex max-w-sm flex-col items-center gap-4 rounded-[8px] border border-[var(--miniapp-border-color,rgba(245,248,255,0.12))] bg-[var(--tg-section-bg-color,#15263a)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]"
+        className="flex max-w-sm flex-col items-center gap-4 rounded-[var(--miniapp-radius-card,24px)] border border-[var(--miniapp-border)] bg-[var(--miniapp-card-surface)] p-6 shadow-[var(--miniapp-shadow-card)]"
         role={isAlert ? 'alert' : 'status'}
         aria-live={isAlert ? 'assertive' : 'polite'}
         aria-label={title || config.title}
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-[var(--miniapp-border-color,rgba(245,248,255,0.12))] bg-[var(--tg-secondary-bg-color,#111f32)] shadow-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--miniapp-border)] bg-[var(--miniapp-panel-bg)] shadow-sm">
           <Icon className={`h-6 w-6 ${config.iconClassName}`} aria-hidden="true" />
         </div>
         <div className="space-y-2">
@@ -142,7 +142,7 @@ export function MiniAppState({
             disabled={actionDisabled}
             aria-busy={actionDisabled ? 'true' : undefined}
             aria-label={actionLabel || 'Try again'}
-            className="miniapp-pressable miniapp-touch-target inline-flex items-center gap-2 rounded-[8px] bg-[var(--tg-button-color,#2aabee)] px-5 text-sm font-black text-[var(--tg-button-text-color,#ffffff)] shadow-sm motion-safe:transition disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+            className="miniapp-pressable miniapp-touch-target inline-flex items-center gap-2 rounded-full bg-[var(--tg-button-color)] px-5 text-sm font-black text-[var(--tg-button-text-color)] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)] motion-safe:transition disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
           >
             <RefreshCw className={`h-4 w-4 ${actionDisabled ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
             {actionLabel || 'Try again'}

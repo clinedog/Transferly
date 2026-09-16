@@ -63,11 +63,12 @@ test('migration backfills queued payouts exactly once with canonical processing 
   await db.run(
     `INSERT INTO payouts (
       id, user_id, idempotency_key, sender_batch_id, status, risk_decision,
-      recipient_type, receiver, amount_cents, currency_code, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      recipient_type, receiver, amount_cents, currency_code, created_at, updated_at, organization_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       'payout-backfill', 'outbox-backfill-user', 'backfill-idempotency', 'backfill-batch',
-      'QUEUED', 'APPROVED', 'EMAIL', 'recipient@example.com', 1000, 'USD', timestamp, timestamp
+      'QUEUED', 'APPROVED', 'EMAIL', 'recipient@example.com', 1000, 'USD', timestamp, timestamp,
+      'personal:outbox-backfill-user'
     ]
   );
 

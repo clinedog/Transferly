@@ -14,10 +14,12 @@ const {
 } = require('../controllers/invoiceController');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { requireAuthenticatedUser } = require('../middleware/authenticateRequest');
+const { requireApiKeyScope } = require('../middleware/requireApiKeyScope');
 
 const router = express.Router();
 
 router.use(requireAuthenticatedUser);
+router.use(requireApiKeyScope('invoices'));
 router.post('/', asyncHandler(createInvoiceController));
 router.post('/preview', asyncHandler(previewInvoiceController));
 router.get('/:id/timeline', asyncHandler(getInvoiceTimelineController));

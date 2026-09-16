@@ -6,6 +6,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
 import BankSlipPreview from '../components/BankSlipPreview';
 import EmailReceiptPreview from '../components/EmailReceiptPreview';
+import { MiniAppPageContainer, SurfaceCard, StatusBadge } from '../components/ui';
 
 function receiptSummary(receipt) {
   const data = receipt.data || receipt;
@@ -164,8 +165,8 @@ export default function HistoryPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-        <div className="rounded-[32px] bg-[#121212] px-6 py-7 text-white shadow-[0_28px_80px_rgba(15,23,42,0.18)] md:px-8">
+      <MiniAppPageContainer className="py-6 md:py-8">
+        <SurfaceCard className="bg-[#121212] px-6 py-7 text-white shadow-[0_28px_80px_rgba(15,23,42,0.18)] md:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
@@ -187,16 +188,16 @@ export default function HistoryPage() {
                 { label: 'Notifications', value: stats.email },
                 { label: 'Funding orders', value: stats.topup }
               ].map((item) => (
-                <div key={item.label} className="rounded-[24px] border border-white/8 bg-white/6 p-4">
+                <SurfaceCard as="div" key={item.label} className="rounded-2xl border-white/8 bg-white/6 p-4 shadow-none">
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/45">{item.label}</p>
                   <p className="mt-3 text-3xl font-black tracking-[-0.05em] text-white">{item.value}</p>
-                </div>
+                </SurfaceCard>
               ))}
             </div>
           </div>
-        </div>
+        </SurfaceCard>
 
-        <div className="mt-6 rounded-[30px] border border-[#e9e0d2] bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] md:p-7">
+        <SurfaceCard className="mt-6 p-5 md:p-7">
           <div className="mb-5 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
             <Filter size={14} />
             Filter transactions
@@ -251,11 +252,11 @@ export default function HistoryPage() {
               />
             </label>
           </div>
-        </div>
+        </SurfaceCard>
 
         <div className="mt-6 space-y-4">
           {filteredActivities.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-[#e4dacb] bg-white px-6 py-14 text-center shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
+            <SurfaceCard className="border-dashed px-6 py-14 text-center">
               <FileText size={58} className="mx-auto text-slate-300" />
               <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-slate-950">No transactions found</h2>
               <p className="mt-2 text-sm text-slate-600">
@@ -269,7 +270,7 @@ export default function HistoryPage() {
                 Explore Services
                 <ArrowRight size={16} />
               </Link>
-            </div>
+            </SurfaceCard>
           ) : (
             filteredActivities.map((activity) => {
               const isTopUp = activity.kind === 'topup';
@@ -277,18 +278,11 @@ export default function HistoryPage() {
               const order = isTopUp ? activity.record : null;
               const data = receipt ? (receipt.data || receipt) : null;
               const summary = isTopUp ? topUpSummary(order) : receiptSummary(receipt);
-              const statusAccent = (
-                summary.status === 'Successful' ||
-                summary.status === 'Sent' ||
-                summary.status === 'completed'
-              ) ? '#10b981' : (
-                summary.status === 'awaiting_confirmation' || summary.status === 'pending' ? '#f59e0b' : '#ef4444'
-              );
 
               return (
-                <div
+                <SurfaceCard as="article"
                   key={isTopUp ? order.order_id : receipt.id}
-                  className="rounded-[28px] border border-[#e9e0d2] bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(15,23,42,0.08)] md:p-6"
+                  className="p-5 transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(15,23,42,0.08)] md:p-6"
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
@@ -302,15 +296,7 @@ export default function HistoryPage() {
                         >
                           {isTopUp ? 'Top up order' : receipt.type === 'bank' ? 'Wallet record' : 'Notification'}
                         </span>
-                        <span
-                          className="rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em]"
-                          style={{
-                            backgroundColor: `${statusAccent}18`,
-                            color: statusAccent
-                          }}
-                        >
-                          {summary.status}
-                        </span>
+                        <StatusBadge status={isTopUp ? order.status : summary.status === 'Successful' || summary.status === 'Sent' ? 'completed' : 'pending'} size="sm" />
                       </div>
 
                       <h2 className="mt-4 truncate text-2xl font-black tracking-[-0.04em] text-slate-950">
@@ -378,12 +364,12 @@ export default function HistoryPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </SurfaceCard>
               );
             })
           )}
         </div>
-      </div>
+      </MiniAppPageContainer>
 
       {modalOpen && selectedReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">

@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "npm run generate:icons --prefix .. && vite",
-    "build": "npm run generate:icons && vite build",
+    "build": "npm run generate:icons --prefix .. && vite build",
     "preview": "vite preview",
     "smoke:providers": "node scripts/providerRouteSmoke.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:list": "playwright test --list",
     "lint": "eslint src tests --ext .js,.jsx --max-warnings=0",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:contract": "node --test test/providerWorkspaceContract.test.js"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",

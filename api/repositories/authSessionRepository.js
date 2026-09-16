@@ -69,6 +69,40 @@ async function rotateToken(sessionId, expectedTokenId, nextTokenId, client = db)
   return result.changes === 1;
 }
 
+async function getSecuritySummary(client = db) {
+  const rows = await client.all(
+    `
+      SELECT status, COUNT(*) AS count
+      FROM auth_sessions
+      GROUP BY status
+    `
+  );
+  return rows.reduce((summary, row) => {
+    summary[String(row.status || 'unknown').toLowerCase()] = Number(row.count || 0);
+    return summary;
+  }, {});
+}
+
+async function listForUser(userId, client = db) {
+  const rows = await client.all(
+    `SELECT id, user_id, status, expires_at, last_refreshed_at, revoked_at, created_at, updated_at
+     FROM auth_sessions WHERE user_id = ? ORDER BY created_at DESC`,
+    [userId]
+  );
+  return rows.map(mapAuthSession);
+}
+
+async function revokeForUser(sessionId, userId, reason, client = db) {
+  const now = new Date().toISOString();
+  const result = await client.run(
+    `UPDATE auth_sessions
+     SET status = 'revoked', revoked_at = ?, revoke_reason = ?, updated_at = ?
+     WHERE id = ? AND user_id = ? AND status = 'active'`,
+    [now, reason, now, sessionId, userId]
+  );
+  return result.changes === 1;
+}
+
 async function revoke(sessionId, expectedTokenId, reason, client = db) {
   const now = new Date().toISOString();
   const result = await client.run(
@@ -90,6 +124,9 @@ module.exports = {
     create,
     findById,
     revoke,
+    revokeForUser,
+    listForUser,
     rotateToken
+    ,getSecuritySummary
   }
 };

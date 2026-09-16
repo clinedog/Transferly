@@ -37,18 +37,20 @@ async function findLedgerEntryByKey(client, entryKey) {
 }
 
 async function insertLedgerEntry(client, input) {
+  const organizationId = input.organizationId || `personal:${input.userId}`;
   await client.run(
     `
       INSERT INTO ledger_entries (
-        id, entry_key, wallet_id, user_id, type, debit_bucket, credit_bucket, amount_cents,
+        id, entry_key, wallet_id, user_id, organization_id, type, debit_bucket, credit_bucket, amount_cents,
         currency_code, reference_type, reference_id, external_reference, description, metadata_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       randomUUID(),
       input.entryKey,
       input.walletId,
       input.userId,
+      organizationId,
       input.type,
       input.debitBucket || null,
       input.creditBucket || null,
@@ -148,7 +150,7 @@ async function assertWalletLedgerInvariant(walletId, client = db) {
 }
 
 async function seedWalletOpeningBalancesInTransaction(input, client) {
-  const wallet = await walletRepository.getOrCreate(client, input.userId, input.currencyCode);
+  const wallet = await walletRepository.getOrCreate(client, input.userId, input.currencyCode, input.organizationId);
   ensureSameCurrency(wallet.currencyCode, input.currencyCode);
   const balances = {
     pendingBalanceCents: Number(input.pendingBalanceCents || 0),
@@ -188,7 +190,7 @@ async function seedWalletOpeningBalancesInTransaction(input, client) {
       throw new AppError(409, 'WALLET_OPENING_BALANCE_CONFLICT', 'Stored wallet opening balances do not match the requested seed balances.');
     }
     await assertWalletLedgerInvariant(wallet.id, client);
-    return walletRepository.findByUserId(input.userId, client);
+    return walletRepository.findByUserId(input.userId, client, input.organizationId);
   }
 
   const ledgerCount = await client.get('SELECT COUNT(*) AS count FROM ledger_entries WHERE wallet_id = ?', [wallet.id]);
@@ -219,7 +221,7 @@ async function seedWalletOpeningBalancesInTransaction(input, client) {
 
 async function creditPendingFromInvoice(input) {
   return transaction(async (client) => {
-    const wallet = await walletRepository.getOrCreate(client, input.userId, input.currencyCode);
+    const wallet = await walletRepository.getOrCreate(client, input.userId, input.currencyCode, input.organizationId);
     ensureSameCurrency(wallet.currencyCode, input.currencyCode);
 
     const entryKey = `invoice-paid:${input.invoiceId}`;
@@ -251,7 +253,7 @@ async function creditPendingFromInvoice(input) {
 
 async function releasePendingFunds(input) {
   return transaction(async (client) => {
-    const wallet = await walletRepository.findByUserId(input.userId, client);
+    const wallet = await walletRepository.findByUserId(input.userId, client, input.organizationId);
     if (!wallet) {
       throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found.');
     }
@@ -311,7 +313,7 @@ async function reservePayoutFunds(input) {
 }
 
 async function reservePayoutFundsInTransaction(input, client) {
-  const wallet = await walletRepository.findByUserId(input.userId, client);
+  const wallet = await walletRepository.findByUserId(input.userId, client, input.organizationId);
   if (!wallet) {
     throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found.');
   }
@@ -356,7 +358,7 @@ async function settlePayout(input) {
 }
 
 async function settlePayoutInTransaction(input, client) {
-  const wallet = await walletRepository.findByUserId(input.userId, client);
+  const wallet = await walletRepository.findByUserId(input.userId, client, input.organizationId);
   if (!wallet) {
     throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found.');
   }
@@ -401,7 +403,7 @@ async function refundReservedPayout(input) {
 }
 
 async function refundReservedPayoutInTransaction(input, client) {
-  const wallet = await walletRepository.findByUserId(input.userId, client);
+  const wallet = await walletRepository.findByUserId(input.userId, client, input.organizationId);
   if (!wallet) {
     throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found.');
   }
@@ -441,7 +443,7 @@ async function refundReservedPayoutInTransaction(input, client) {
 
 async function adjustForInvoiceRefund(input) {
   return transaction(async (client) => {
-    const wallet = await walletRepository.findByUserId(input.userId, client);
+    const wallet = await walletRepository.findByUserId(input.userId, client, input.organizationId);
     if (!wallet) {
       throw new AppError(404, 'WALLET_NOT_FOUND', 'Wallet not found.');
     }

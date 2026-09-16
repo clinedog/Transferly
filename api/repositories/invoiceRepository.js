@@ -11,6 +11,7 @@ function mapInvoice(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id || null,
     templateId: row.template_id,
     paypalInvoiceId: row.paypal_invoice_id,
     invoiceNumber: row.invoice_number,
@@ -45,8 +46,8 @@ async function create(data, client = db) {
         id, user_id, template_id, paypal_invoice_id, invoice_number, status, amount_cents, currency_code,
         recipient_email, description, invoice_url, paypal_details_json, paypal_qr_details_json,
         paypal_synced_at, metadata_json, issue_date, due_date, auto_reminders_cancelled_at, paid_at,
-        cancelled_at, refunded_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        cancelled_at, refunded_at, created_at, updated_at, organization_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       id,
@@ -71,7 +72,8 @@ async function create(data, client = db) {
       data.cancelledAt || null,
       data.refundedAt || null,
       now,
-      now
+      now,
+      data.organizationId || `personal:${data.userId}`
     ]
   );
 
@@ -137,6 +139,11 @@ function buildFindManyWhere(filters) {
   if (filters.userId) {
     clauses.push('user_id = ?');
     params.push(filters.userId);
+  }
+
+  if (filters.organizationId) {
+    clauses.push('organization_id = ?');
+    params.push(filters.organizationId);
   }
 
   if (filters.status) {

@@ -26,6 +26,7 @@ const {
   adminTestimonialUpdateSchema,
   adminUserIdParamsSchema,
   adminFinanceAlertsQuerySchema,
+  adminAuditLogsQuerySchema,
   adminFinanceTransactionsQuerySchema,
   adminPaymentTransactionsQuerySchema,
   listPaymentOpsIssuesQuerySchema,
@@ -65,7 +66,12 @@ const {
   listRiskSignalsQuerySchema,
   riskCaseParamsSchema,
   riskCaseStatusUpdateSchema,
-  riskCaseFalsePositiveSchema
+  riskCaseFalsePositiveSchema,
+  providerIncidentParamsSchema,
+  providerIncidentTransitionSchema,
+  automationRuleCreateSchema,
+  automationRuleStatusSchema,
+  automationRuleDryRunSchema
 } = require('../schemas/adminSchemas');
 const {
   presentAdminPayout,
@@ -106,6 +112,10 @@ const { financeOpsService } = require('../services/financeOpsService');
 const { pointsFundingService } = require('../services/pointsFundingService');
 const { providerHealthService } = require('../services/providerHealthService');
 const { providerReadinessReportService } = require('../services/providerReadinessReportService');
+const { productionReadinessService } = require('../services/productionReadinessService');
+const { providerIncidentService } = require('../services/providerIncidentService');
+const { automationHistoryService } = require('../services/automationHistoryService');
+const { securityOverviewService } = require('../services/securityOverviewService');
 const { paypalPayoutService } = require('../services/paypalPayoutService');
 const { providerPayoutService } = require('../services/providerPayoutService');
 const { slipcraftUserService } = require('../services/slipcraftUserService');
@@ -260,6 +270,73 @@ async function listPaymentProviderReadinessController(_request, response) {
   response.json({
     data: await providerReadinessReportService.listProviderReadinessReport()
   });
+}
+
+async function getProductionReadinessController(request, response) {
+  response.json(await productionReadinessService.buildReport({
+    requestId: request.id,
+    correlationId: request.correlationId
+  }));
+}
+
+async function listProviderIncidentsController(_request, response) {
+  response.json({ data: await providerIncidentService.listProviderIncidents() });
+}
+
+async function transitionProviderIncidentController(request, response) {
+  const { id } = providerIncidentParamsSchema.parse(request.params);
+  const { status } = providerIncidentTransitionSchema.parse(request.body || {});
+  response.json({
+    data: await providerIncidentService.transitionIncident({
+      incidentId: id,
+      status,
+      adminActorId: request.adminActorId
+    })
+  });
+}
+
+async function listAutomationHistoryController(request, response) {
+  response.json({
+    data: await automationHistoryService.listHistory({
+      limit: request.query?.limit,
+      before: request.query?.before
+    })
+  });
+}
+
+async function listAutomationRulesController(_request, response) {
+  response.json({ data: await require('../services/automationRuleService').automationRuleService.list() });
+}
+
+async function createAutomationRuleController(request, response) {
+  response.status(201).json({ data: await require('../services/automationRuleService').automationRuleService.create({
+    ...automationRuleCreateSchema.parse(request.body || {}),
+    actorId: request.adminActorId
+  }) });
+}
+
+async function updateAutomationRuleStatusController(request, response) {
+  response.json({ data: await require('../services/automationRuleService').automationRuleService.setStatus({
+    id: request.params.id,
+    ...automationRuleStatusSchema.parse(request.body || {}),
+    actorId: request.adminActorId
+  }) });
+}
+
+async function dryRunAutomationRuleController(request, response) {
+  response.json({ data: await require('../services/automationRuleService').automationRuleService.dryRun({
+    id: request.params.id,
+    event: automationRuleDryRunSchema.parse(request.body || {}),
+    idempotencyKey: request.headers['idempotency-key'] || undefined
+  }) });
+}
+
+async function listAutomationExecutionsController(request, response) {
+  response.json({ data: await require('../services/automationRuleService').automationRuleService.listExecutions({ ruleId: request.query.ruleId }) });
+}
+
+async function getSecurityOverviewController(_request, response) {
+  response.json(await securityOverviewService.getOverview());
 }
 
 async function getPaymentProviderController(request, response) {
@@ -537,6 +614,11 @@ async function listAdminUsersController(_request, response) {
 
 async function getAdminFinanceOverviewController(_request, response) {
   response.json({ overview: await financeOpsService.getOverview() });
+}
+
+async function listAdminAuditLogsController(request, response) {
+  const query = adminAuditLogsQuerySchema.parse(request.query || {});
+  response.json({ data: await auditLogService.list(query) });
 }
 
 async function listAdminFinanceTransactionsController(request, response) {
@@ -1042,6 +1124,7 @@ module.exports = {
   getAdminFundingRequestController,
   getAdminFundingEvidenceController,
   getAdminFinanceOverviewController,
+  listAdminAuditLogsController,
   getAdminUserRiskProfileController,
   getAdminUserFinanceProfileController,
   getRiskOverviewController,
@@ -1074,6 +1157,16 @@ module.exports = {
   getOperationalDiagnosticsController,
   listPaymentProviderHealthController,
   listPaymentProviderReadinessController,
+  getProductionReadinessController,
+  listProviderIncidentsController,
+  transitionProviderIncidentController,
+  listAutomationHistoryController,
+  listAutomationRulesController,
+  createAutomationRuleController,
+  updateAutomationRuleStatusController,
+  dryRunAutomationRuleController,
+  listAutomationExecutionsController,
+  getSecurityOverviewController,
   getPaymentProviderInvoiceFeaturesController,
   getPaymentProviderBalanceController,
   getPaymentProviderController,

@@ -5,6 +5,7 @@ const { paymentProviderTransactionRepository } = require('../repositories/paymen
 const { auditLogService } = require('./auditLogService');
 const { paypalWebhookHandlers } = require('../webhooks/paypalWebhookHandlers');
 const { providerInvoiceWebhookHandlers } = require('../webhooks/providerInvoiceWebhookHandlers');
+const { automationDispatchService } = require('./automationDispatchService');
 const { AppError } = require('../utils/errors');
 const {
   verifyCoinbaseWebhookSignature,
@@ -22,6 +23,14 @@ const paypalClient = new PayPalClient(
   config.PAYPAL_CLIENT_SECRET,
   config.PAYPAL_ENVIRONMENT
 );
+
+function webhookAutomationTrigger(eventType) {
+  if (['INVOICING.INVOICE.PAID', 'invoice.paid', 'invoice.payment_succeeded'].includes(eventType)) return 'INVOICE_PAID';
+  if (['invoice.payment_failed', 'charge.failed', 'checkout.payment.failed'].includes(eventType)) return 'PAYMENT_FAILED';
+  if (['PAYMENT.PAYOUTS-ITEM.SUCCEEDED', 'PAYMENT.PAYOUTSBATCH.SUCCESS'].includes(eventType)) return 'PAYOUT_SUCCEEDED';
+  if (['PAYMENT.PAYOUTS-ITEM.FAILED', 'PAYMENT.PAYOUTS-ITEM.DENIED', 'PAYMENT.PAYOUTSBATCH.DENIED'].includes(eventType)) return 'PAYOUT_FAILED';
+  return null;
+}
 
 function isUniqueConstraintError(error) {
   return error?.code === 'SQLITE_CONSTRAINT' || /unique constraint/i.test(String(error?.message || ''));
@@ -468,12 +477,37 @@ async function processWebhookEvent(webhookEventId) {
           status: WEBHOOK_PROCESSING_STATUS.IGNORED
         };
     }
+
   } catch (error) {
     await webhookEventRepository.update(webhookEvent.id, {
       status: WEBHOOK_PROCESSING_STATUS.FAILED,
       lastError: error.message
     });
     throw error;
+  }
+
+  const trigger = webhookAutomationTrigger(webhookEvent.eventType);
+  if (trigger) {
+    try {
+      await automationDispatchService.dispatch({
+        event: {
+          trigger,
+          eventId: webhookEvent.eventId,
+          entityId: event?.resource?.id || event?.data?.id || event?.id || null,
+          provider: webhookEvent.provider || null,
+          status: event?.resource?.status || event?.data?.status || null,
+          occurredAt: event?.create_time || event?.created_at || new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      await auditLogService.log({
+        actorType: AUDIT_ACTOR_TYPE.WEBHOOK,
+        action: 'automation.dispatch_failed',
+        entityType: 'webhook_event',
+        entityId: webhookEvent.id,
+        metadata: { trigger, error: error.message }
+      });
+    }
   }
 
   await webhookEventRepository.update(webhookEvent.id, {

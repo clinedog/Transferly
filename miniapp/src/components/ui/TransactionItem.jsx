@@ -25,7 +25,7 @@ export function TransactionItem({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-[24px] border border-[var(--miniapp-border-color)] bg-[var(--miniapp-card-bg)] p-4 text-left text-[var(--tg-text-color)] transition-all duration-300 hover:translate-y-[-1px] hover:border-[var(--miniapp-accent-border)] hover:shadow-lg-glass"
+      className="miniapp-surface-card miniapp-surface-card-interactive w-full p-4 text-left text-[var(--tg-text-color)]"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">

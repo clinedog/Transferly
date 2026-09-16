@@ -35,6 +35,10 @@ async function loadAccessiblePayout(request, response, payoutId) {
   }
 
   assertCanAccessUserResource(request, payout.userId);
+  if (request.auth.organizationId && payout.organizationId !== request.auth.organizationId) {
+    response.status(404).json({ code: 'PAYOUT_NOT_FOUND', message: 'Payout not found.' });
+    return null;
+  }
   return payout;
 }
 
@@ -55,6 +59,7 @@ async function createPayoutController(request, response) {
     const payout = await providerPayoutService.requestPayout({
       ...body,
       userId,
+      organizationId: request.auth.organizationId,
       actorType: resolveAuditActorType(request),
       actorId: resolveAuditActorId(request),
       idempotencyKey: request.idempotencyKey
@@ -82,6 +87,7 @@ async function createPayoutController(request, response) {
   const payout = await paypalPayoutService.requestPayout({
     ...body,
     userId,
+    organizationId: request.auth.organizationId,
     idempotencyKey: request.idempotencyKey
   });
 
@@ -121,7 +127,8 @@ async function previewPayoutController(request, response) {
 
   const preview = await paypalPayoutService.previewPayout({
     ...body,
-    userId
+    userId,
+    organizationId: request.auth.organizationId
   });
   response.json(preview);
 }
@@ -145,7 +152,7 @@ async function listPayoutsController(request, response) {
     pageSize,
     offset: (query.page - 1) * pageSize
   };
-  const scopedFilters = userId ? { ...filters, userId } : filters;
+  const scopedFilters = { ...filters, ...(userId ? { userId } : {}), organizationId: request.auth.organizationId };
   const [payouts, total] = await Promise.all([
     payoutRepository.findMany(scopedFilters),
     payoutRepository.countMany(scopedFilters)

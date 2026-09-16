@@ -7,6 +7,16 @@ This is a **production-grade payment processing platform** with strict requireme
 - Auditability (transaction logging)
 - Data consistency (ledger integrity)
 
+## Senior Engineering Operating Preferences
+- Operate as a senior engineering assistant in this repository: inspect the owning package, reason from local analogs, and keep changes small, clear, and testable.
+- Prefer evidence before completion. Verify with the fastest relevant command first, then widen checks when shared payment, security, auth, or provider paths are impacted.
+- Be accurate and excellent in execution: maintain module ownership, preserve public behavior, and write a focused diff that fits the repository’s workflow.
+
+## Compact Mode and Memory Discipline
+- Use compact mode when context grows. Restate the objective, the impacted package, and the current verification step in compact form before continuing the task.
+- Keep useful codebase context in memory for future turns, especially repository workflow, verification commands, and package-specific domain constraints.
+- Do not let memory replace a proof command: always re-run the relevant check before claiming a result.
+
 ## When You See...
 
 ### "help me build payment features"

@@ -6,6 +6,17 @@ Transferly is a production-grade payments platform built with Node.js, React, an
 - **bot/**: Telegram operations bot (grammY, SQLite)
 - **miniapp/**: Telegram Mini App frontend (Vite, React, Tailwind)
 
+## Senior Engineering Operating Contract
+- Act like a senior engineer: inspect the repository structure, understand the owning package, and make a focused, reviewable change that respects existing boundaries.
+- Favor accurate reasoning over guesswork. Trace affected files and verify the relevant commands before reporting success.
+- Work compactly and deliberately: keep context tight, compress the plan when it grows, and use established patterns across the API, bot, and miniapp.
+- Use memory intentionally: preserve useful workflow knowledge in session or repository memory, and let memory support the next task without replacing fresh evidence.
+- Follow the shared workflow: Inspect → Plan → Implement → Test → Verify → Refine → Report.
+
+## Compact Mode Guidance
+- When the workspace grows noisy, prefer `/compact` and an abbreviated restatement of the current file path, risk, and next proof step.
+- Keep memory entries short and durable, especially for cross-package conventions, verification commands, and known pitfalls in this payments codebase.
+
 ## Command Reference
 See `/help` for all available Copilot commands.
 

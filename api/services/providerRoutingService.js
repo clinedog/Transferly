@@ -54,12 +54,6 @@ const {
 } = require('../core/financial/providerContract');
 
 /**
- * Canonical transaction type → provider operation mapping (single source of
- * truth re-exported from the provider contract so consumers cannot diverge).
- */
-const OPERATION_BY_TRANSACTION_TYPE_INDEX = OPERATION_BY_TRANSACTION_TYPE;
-
-/**
  * Adapter contract methods used to infer a canonical operation status when the
  * operation is not tracked by the Transferly enablement matrix.
  */
@@ -173,7 +167,8 @@ function matchesPaymentMethod(summaryCapabilities, canonicalPaymentMethod) {
     wallet: ['wallet_payments', 'walletPayments'],
     qr: ['qr_payments', 'qrPayments'],
     direct_debit: ['direct_debit', 'directDebit'],
-    ussd: ['ussd']
+    ussd: ['ussd'],
+    bnpl: ['bnpl', 'buy_now_pay_later', 'buy_now_pay_later_payment']
   };
   const keys = legacyKeys[wanted] || [];
   const supported = keys.some((key) => Boolean(summaryCapabilities[key]));

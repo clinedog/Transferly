@@ -58,9 +58,47 @@ async function findManyForEntity(entityType, entityId, options = {}, client = db
   return rows.map(mapAuditLog);
 }
 
+async function findMany(filters = {}, client = db) {
+  const where = [];
+  const params = [];
+  if (filters.actorType) {
+    where.push('actor_type = ?');
+    params.push(filters.actorType);
+  }
+  if (filters.action) {
+    where.push('action LIKE ?');
+    params.push(`%${filters.action}%`);
+  }
+  if (filters.entityType) {
+    where.push('entity_type = ?');
+    params.push(filters.entityType);
+  }
+  if (filters.entityId) {
+    where.push('entity_id = ?');
+    params.push(filters.entityId);
+  }
+  if (filters.before) {
+    where.push('created_at < ?');
+    params.push(filters.before);
+  }
+  const limit = Math.min(Number(filters.limit || 100), 250);
+  const rows = await client.all(
+    `
+      SELECT id, actor_type, actor_id, action, entity_type, entity_id, metadata_json, created_at
+      FROM audit_logs
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `,
+    [...params, limit]
+  );
+  return rows.map(mapAuditLog);
+}
+
 module.exports = {
   auditLogRepository: {
     create,
-    findManyForEntity
+    findManyForEntity,
+    findMany
   }
 };

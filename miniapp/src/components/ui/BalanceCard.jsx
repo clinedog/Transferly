@@ -11,7 +11,7 @@ export function BalanceCard({ label, balance, currency = 'USD', isVisible = true
   const ToggleIcon = showBalance ? Eye : EyeOff;
 
   return (
-    <div className="rounded-[28px] border border-[var(--miniapp-border-color)] bg-[var(--miniapp-card-bg)] p-6 text-[var(--tg-text-color)] shadow-[0_18px_48px_rgba(0,0,0,0.18)]">
+    <div className="miniapp-surface-card p-6 text-[var(--tg-text-color)]">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--miniapp-shell-text-muted)]">
           {label}
@@ -20,7 +20,7 @@ export function BalanceCard({ label, balance, currency = 'USD', isVisible = true
           type="button"
           onClick={() => setShowBalance(!showBalance)}
           aria-label={showBalance ? 'Hide balance' : 'Show balance'}
-          className="miniapp-pressable inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--miniapp-accent-soft)] text-[var(--tg-button-color)] transition hover:brightness-110"
+          className="miniapp-pressable miniapp-touch-target inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--miniapp-accent-soft)] text-[var(--tg-button-color)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--miniapp-focus-ring)]"
         >
           <ToggleIcon size={18} aria-hidden="true" />
         </button>

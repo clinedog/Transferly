@@ -1,0 +1,58 @@
+name: Transferly Governance Gates
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.cline/skills/**'
+      - '.codex/skills/**'
+      - 'scripts/validate-skills.js'
+      - 'api/**'
+      - 'miniapp/**'
+      - 'bot/**'
+      - '.github/workflows/transferly-governance.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.cline/skills/**'
+      - '.codex/skills/**'
+      - 'scripts/validate-skills.js'
+      - 'api/**'
+      - 'miniapp/**'
+      - 'bot/**'
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Validate shared Copilot skills
+        run: npm run validate:skills
+
+      - name: Install API dependencies
+        run: npm ci --prefix api
+
+      - name: Install Mini App dependencies
+        run: npm ci --prefix miniapp
+
+      - name: Run API production readiness gate
+        run: npm run production:check --prefix api
+
+      - name: Run API lint
+        run: npm run lint --prefix api
+
+      - name: Run Mini App lint
+        run: npm run lint --prefix miniapp
+
+      - name: Build Mini App
+        run: npm run build --prefix miniapp

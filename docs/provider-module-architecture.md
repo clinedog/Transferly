@@ -279,6 +279,30 @@ Each per-provider `webhooks.js` implements:
 
 `GET /api/admin/payment-providers/readiness` is an admin-authenticated operational summary. It includes disabled discovery modules such as Binance and Cash App, but it does not activate routes, API calls, webhooks, custody, or money movement. Disabled modules have no health probe and explicitly recommend completing the approved integration before enablement.
 
+### Execution readiness contract
+
+Provider readiness is authoritative at the operation level. The provider readiness and status responses expose a legacy `status` field for compatibility and canonical `operation_status`, `execution_eligible`, `production_enabled`, and `sandbox_enabled` fields for all new consumers. Valid canonical states are `unsupported`, `planned`, `coming_soon`, `preview`, `sandbox`, `live`, `disabled`, `degraded`, and `maintenance`.
+
+Only `live` is production-executable. `sandbox` can execute only in a sandbox environment; all other states are non-executable even when shown in the UI. Configuration and credential readiness contain environment-variable names and missing names only—never values. Country and currency allowlists are restrictive: an absent declaration means unknown support, never worldwide support.
+
+Use `buildProviderReadinessDescriptor()` from `api/core/financial/providerContract.js` for new provider or admin surfaces. It is the canonical adapter-to-product translation; do not infer readiness from a UI lane, a provider name, or a non-empty capability list.
+### Normalized result + error contract
+
+Beyond readiness, provider **responses and errors** are normalized before they can influence domain logic. `api/core/financial/providerContract.js` exports provider-agnostic helpers that every adapter-facing integration should go through:
+
+- `normalizeProviderOutcome(rawStatus)` maps a raw provider status to a canonical financial outcome (`success` | `failed` | `unknown`). Normalization is deliberately conservative: empty, pending/in-flight, and unrecognised statuses resolve to `unknown`, never to `success`.
+- `buildProviderResult({ operation, provider, rawStatus, settlement, ... })` produces the canonical result for a payment, payout, refund, or balance operation. It separates `outcome` from `settlement` and raises `reconciliation_required: true` whenever the outcome or settlement is `unknown`.
+- `categorizeProviderError(error)` classifies an error into a canonical category (`authentication`, `timeout`, `rate_limit`, `provider_down`, `insufficient_funds`, `declined`, `duplicate`, `invalid_request`, `configuration`, `connectivity`, `unknown`) with a deterministic `retryable` answer. The raw provider message is never surfaced (`raw_provider_error_exposed: false`).
+- `screenSafeMetadata(metadata)` redacts credential-shaped values and sensitive keys, and truncates deep/large payloads, so provider request material cannot reach logs, API responses, or clients.
+- `normalizeWebhookEvent(...)` classifies an inbound event as `financial`, `dispute`, `administrative`, or `unknown` and flags unknown financial outcomes for reconciliation.
+
+Two invariants apply to all of these helpers:
+
+1. An unknown or ambiguous provider outcome is **never** silently settled as `success`; it must enter reconciliation.
+2. Provider transaction IDs and references are preserved, but secret material is never echoed.
+
+These helpers compose with the readiness descriptor so a capability can be production-eligible for routing (`execution_eligible.production === true`) while its live runtime result is still normalized safely.
+
 Every provider exposes `GET /api/providers/<key>/health` (auth-guarded).
 Returns HTTP 200 when configured, 503 when env vars are missing.
 

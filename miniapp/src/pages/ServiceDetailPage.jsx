@@ -41,6 +41,7 @@ import {
   getServiceCommandCenter,
   normalizeServiceCommandCenterView
 } from '../lib/serviceCommandCenters';
+import { SurfaceCard } from '../components/ui';
 import {
   createStripeConnectedAccount,
   createStripeConnectedAccountOnboardingLink,
@@ -153,7 +154,7 @@ function ProviderReadinessPanel({ providerLauncher, providerStatus, invoiceFeatu
   const invoiceFeature = invoiceFeatures?.invoice_features;
 
   return (
-    <div className="rounded-[28px] border border-white/70 bg-white p-5">
+    <SurfaceCard className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Provider Readiness</p>
@@ -205,7 +206,7 @@ function ProviderReadinessPanel({ providerLauncher, providerStatus, invoiceFeatu
           </p>
         </div>
       ) : null}
-    </div>
+    </SurfaceCard>
   );
 }
 
@@ -216,31 +217,39 @@ function formatProviderMoney(entry) {
 function ProviderBalancePanel({ balance, loading, error }) {
   if (loading) {
     return (
-      <div className="rounded-[28px] border border-white/70 bg-white p-5">
+      <SurfaceCard className="p-5">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Wallet Balance</p>
         <p className="mt-3 text-sm font-bold text-slate-600">Loading provider balance...</p>
-      </div>
+      </SurfaceCard>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-5">
+      <SurfaceCard className="border-rose-200 bg-rose-50 p-5">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-rose-500">Wallet Balance</p>
         <p className="mt-3 text-sm font-bold text-rose-700">{error}</p>
-      </div>
+      </SurfaceCard>
     );
   }
 
   if (!balance) {
-    return null;
+    return (
+      <SurfaceCard className="border-amber-300/30 bg-amber-300/10 p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-200">Wallet Balance</p>
+        <p className="mt-3 text-lg font-black text-[var(--tg-text-color)]">Balance unavailable</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
+          The provider did not return a balance. Transferly has not substituted zero or treated this as a confirmed balance.
+        </p>
+      </SurfaceCard>
+    );
   }
 
   const available = Array.isArray(balance.available) ? balance.available : [];
   const pending = Array.isArray(balance.pending) ? balance.pending : [];
 
   return (
-    <div className="rounded-[28px] border border-white/70 bg-white p-5">
+    <SurfaceCard className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Wallet Balance</p>
@@ -278,7 +287,7 @@ function ProviderBalancePanel({ balance, loading, error }) {
           </div>
         </div>
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 

@@ -508,6 +508,8 @@ module.exports = {
   getProviderTokensController,
   getProviderTransactionsController,
   getProviderWebhooksController,
+  getProviderWorkspaceController,
+  getProviderWalletController,
   listProviderReadinessController,
   listProviderInvoicesController,
   listProviderLanesController,
