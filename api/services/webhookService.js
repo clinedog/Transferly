@@ -319,7 +319,9 @@ async function ingestCryptoEvent(headers, event, rawBody, requestHeaders = {}) {
 }
 
 async function ingestPaystackEvent(headers, event, rawBody) {
-  const secret = config.PAYSTACK_WEBHOOK_SECRET || config.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET_KEY || '';
+  // Paystack signs webhook payloads with the secret key. Keep the separate
+  // webhook secret as a backwards-compatible fallback for older deployments.
+  const secret = config.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET_KEY || config.PAYSTACK_WEBHOOK_SECRET || '';
   assertProductionWebhookSecret('Paystack', secret);
   verifyPaystackSignature(rawBody, headers.signature, secret);
 
