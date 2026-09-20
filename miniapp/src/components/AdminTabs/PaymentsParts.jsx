@@ -64,15 +64,15 @@ export function PaginationControls({ pagination, onPrevious, onNext }) {
 
 export function StatusPill({ value, tone = 'gray' }) {
   const styles = {
-    gray: 'bg-gray-100 text-gray-700',
-    blue: 'bg-blue-100 text-blue-700',
-    green: 'bg-emerald-100 text-emerald-700',
-    amber: 'bg-amber-100 text-amber-700',
-    red: 'bg-red-100 text-red-700'
+    gray: 'border-[var(--miniapp-border)] bg-[var(--miniapp-panel-bg)] text-[var(--miniapp-text-secondary)]',
+    blue: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-300',
+    green: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300',
+    amber: 'border-amber-300/25 bg-amber-300/10 text-amber-200',
+    red: 'border-rose-400/25 bg-rose-400/10 text-rose-200'
   };
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[tone] || styles.gray}`}>
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[tone] || styles.gray}`}>
       {value}
     </span>
   );

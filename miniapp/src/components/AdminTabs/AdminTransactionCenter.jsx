@@ -31,21 +31,21 @@ function TransactionCard({ item }) {
   const status = item.status || item.severity || item.match_status || 'UNKNOWN';
 
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <article className="miniapp-surface-card miniapp-surface-card-interactive p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-gray-950">{title}</p>
-          <p className="mt-1 text-xs font-semibold text-gray-500">{detail}</p>
+          <p className="truncate text-sm font-black text-[var(--miniapp-text-primary)]">{title}</p>
+          <p className="mt-1 text-xs font-semibold text-[var(--miniapp-text-secondary)]">{detail}</p>
         </div>
         <StatusPill value={label(status)} tone={statusTone[String(status).toUpperCase()] || 'gray'} />
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-        <div><dt className="font-bold uppercase tracking-wide text-gray-400">Type</dt><dd className="mt-1 font-black text-gray-800">{label(item.type || item.kind)}</dd></div>
-        <div><dt className="font-bold uppercase tracking-wide text-gray-400">Provider</dt><dd className="mt-1 font-black text-gray-800">{item.provider || 'Ledger'}</dd></div>
-        <div><dt className="font-bold uppercase tracking-wide text-gray-400">User</dt><dd className="mt-1 truncate font-black text-gray-800">{item.user_id || 'Not linked'}</dd></div>
-        <div><dt className="font-bold uppercase tracking-wide text-gray-400">Amount</dt><dd className="mt-1 font-black text-gray-800">{item.points !== undefined ? `${Number(item.signed_points || item.points).toLocaleString()} pts` : item.amount_minor ? `${Number(item.amount_minor).toLocaleString()} minor` : 'Not available'}</dd></div>
+        <div><dt className="miniapp-mono-meta text-[var(--miniapp-text-muted)]">Type</dt><dd className="mt-1 font-black text-[var(--miniapp-text-primary)]">{label(item.type || item.kind)}</dd></div>
+        <div><dt className="miniapp-mono-meta text-[var(--miniapp-text-muted)]">Provider</dt><dd className="mt-1 font-black text-[var(--miniapp-text-primary)]">{item.provider || 'Ledger'}</dd></div>
+        <div><dt className="miniapp-mono-meta text-[var(--miniapp-text-muted)]">User</dt><dd className="mt-1 truncate font-black text-[var(--miniapp-text-primary)]">{item.user_id || 'Not linked'}</dd></div>
+        <div><dt className="miniapp-mono-meta text-[var(--miniapp-text-muted)]">Amount</dt><dd className="mt-1 font-black text-[var(--miniapp-text-primary)]">{item.points !== undefined ? `${Number(item.signed_points || item.points).toLocaleString()} pts` : item.amount_minor ? `${Number(item.amount_minor).toLocaleString()} minor` : 'Not available'}</dd></div>
       </dl>
-      {isIssue ? <p className="mt-3 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-800">Exception requires operational review. Provider outcome is not inferred from this record.</p> : null}
+      {isIssue ? <p className="mt-3 rounded-xl border border-rose-400/25 bg-rose-400/10 p-3 text-xs font-bold text-rose-200">Exception requires operational review. Provider outcome is not inferred from this record.</p> : null}
     </article>
   );
 }
@@ -98,23 +98,23 @@ export default function AdminTransactionCenter() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Financial operations</p>
-          <h2 className="mt-2 text-3xl font-black tracking-tight text-gray-950">Transaction center</h2>
-          <p className="mt-1 max-w-3xl text-sm font-semibold text-gray-500">Search ledger activity and exception records without exposing provider credentials or payment secrets.</p>
+          <p className="miniapp-mono-meta text-[var(--miniapp-accent-cyan)]">Financial operations</p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-[var(--miniapp-text-primary)]">Transaction center</h2>
+          <p className="mt-1 max-w-3xl text-sm font-semibold text-[var(--miniapp-text-secondary)]">Search ledger activity and exception records without exposing provider credentials or payment secrets.</p>
         </div>
-        <button type="button" onClick={load} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-3 text-sm font-black text-white disabled:opacity-50"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+        <button type="button" onClick={load} disabled={loading} className="miniapp-pressable miniapp-touch-target inline-flex items-center justify-center gap-2 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-accent-border)] bg-[var(--miniapp-accent-soft)] px-4 text-sm font-black text-[var(--miniapp-accent-cyan)] disabled:opacity-50"><RefreshCw size={16} className={loading ? 'motion-safe:animate-spin' : ''} /> Refresh</button>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4"><WalletCards className="text-blue-600" size={20} /><p className="mt-3 text-xs font-black uppercase tracking-wide text-gray-400">Records</p><p className="mt-1 text-2xl font-black">{records.length.toLocaleString()}</p></div>
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-4"><ShieldAlert className="text-red-600" size={20} /><p className="mt-3 text-xs font-black uppercase tracking-wide text-red-700">Exceptions</p><p className="mt-1 text-2xl font-black text-red-950">{exceptions.toLocaleString()}</p></div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4"><AlertTriangle className="text-amber-600" size={20} /><p className="mt-3 text-xs font-black uppercase tracking-wide text-amber-700">Showing</p><p className="mt-1 text-2xl font-black text-amber-950">{filtered.length.toLocaleString()}</p></div>
+        <div className="miniapp-surface-card p-4"><WalletCards className="text-[var(--miniapp-accent-cyan)]" size={20} /><p className="miniapp-mono-meta mt-3 text-[var(--miniapp-text-muted)]">Records</p><p className="mt-1 text-2xl font-black text-[var(--miniapp-text-primary)]">{records.length.toLocaleString()}</p></div>
+        <div className="rounded-[var(--miniapp-radius-card)] border border-rose-400/20 bg-rose-400/10 p-4"><ShieldAlert className="text-rose-300" size={20} /><p className="miniapp-mono-meta mt-3 text-rose-200">Exceptions</p><p className="mt-1 text-2xl font-black text-rose-100">{exceptions.toLocaleString()}</p></div>
+        <div className="rounded-[var(--miniapp-radius-card)] border border-amber-300/20 bg-amber-300/10 p-4"><AlertTriangle className="text-amber-200" size={20} /><p className="miniapp-mono-meta mt-3 text-amber-100">Showing</p><p className="mt-1 text-2xl font-black text-amber-50">{filtered.length.toLocaleString()}</p></div>
       </section>
 
-      <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+      <section className="miniapp-surface-card p-4">
         <div className="flex flex-col gap-3 lg:flex-row">
-          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2"><Search size={16} className="text-gray-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && load()} placeholder="Search transaction, provider reference, user, invoice" className="min-w-0 flex-1 border-0 text-sm font-semibold outline-none" /></label>
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700">
+          <label className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-border)] bg-[var(--miniapp-bg)] px-3 py-2"><Search size={16} className="text-[var(--miniapp-text-muted)]" /><span className="sr-only">Search transactions</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && load()} placeholder="Search transaction, provider reference, user, invoice" className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-[var(--miniapp-text-primary)] outline-none placeholder:text-[var(--miniapp-text-muted)]" /></label>
+          <select aria-label="Filter transaction records" value={filter} onChange={(event) => setFilter(event.target.value)} className="min-h-12 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-border)] bg-[var(--miniapp-bg)] px-3 py-2 text-sm font-bold text-[var(--miniapp-text-primary)]">
             <option value="all">All records</option>
             <option value="ledger">Ledger transactions</option>
             <option value="unmatched">Unmatched payments</option>
@@ -122,12 +122,12 @@ export default function AdminTransactionCenter() {
             <option value="issue">Provider issues</option>
             <option value="open">Open only</option>
           </select>
-          <button type="button" onClick={load} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white">Search</button>
+          <button type="button" onClick={load} className="miniapp-pressable miniapp-touch-target rounded-[var(--miniapp-radius-control)] bg-[var(--tg-button-color)] px-4 text-sm font-black text-[var(--tg-button-text-color)]">Search</button>
         </div>
       </section>
-      {warning ? <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">{warning}</div> : null}
+      {warning ? <div role="alert" className="rounded-[var(--miniapp-radius-card)] border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">{warning}</div> : null}
 
-      {loading ? <div className="py-16 text-center text-sm font-bold text-gray-500">Loading transaction records…</div> : filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item, index) => <TransactionCard key={`${item.kind}-${item.id || index}`} item={item} />)}</div> : <div className="rounded-3xl border border-dashed border-gray-300 p-12 text-center text-sm font-bold text-gray-500">No records match the selected filters.</div>}
+      {loading ? <div className="miniapp-surface-card flex min-h-40 items-center justify-center p-6 text-sm font-bold text-[var(--miniapp-text-secondary)]" role="status" aria-live="polite">Loading transaction records…</div> : filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item, index) => <TransactionCard key={`${item.kind}-${item.id || index}`} item={item} />)}</div> : <div className="rounded-[var(--miniapp-radius-card)] border border-dashed border-[var(--miniapp-border)] p-12 text-center text-sm font-bold text-[var(--miniapp-text-secondary)]" role="status">No records match the selected filters.</div>}
     </div>
   );
 }
