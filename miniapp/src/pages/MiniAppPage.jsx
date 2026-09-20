@@ -1026,23 +1026,57 @@ function FeaturedStrip() {
   const featured = ['ai-reply', 'articles', 'transaction-record', 'faker-data']
     .map((slug) => getServiceBySlug(slug))
     .filter(Boolean);
-  const primary = featured[0];
-  const secondary = featured.slice(1);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const primary = featured[activeIndex] || featured[0];
+  const secondary = featured.filter((_service, index) => index !== activeIndex);
 
   if (!primary) {
     return null;
   }
 
+  const showPrevious = () => {
+    setActiveIndex((current) => (current - 1 + featured.length) % featured.length);
+  };
+
+  const showNext = () => {
+    setActiveIndex((current) => (current + 1) % featured.length);
+  };
+
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Featured</h3>
-        <Link to="/miniapp/services" className="text-sm font-black text-[var(--tg-button-color)]">
-          See all
-        </Link>
+        <div>
+          <p className="miniapp-mono-meta text-[var(--miniapp-accent-cyan)]">Discovery</p>
+          <h3 className="mt-1 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Featured</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="hidden text-[11px] font-black tabular-nums text-[var(--tg-hint-color)] sm:block" aria-live="polite">
+            {String(activeIndex + 1).padStart(2, '0')} / {String(featured.length).padStart(2, '0')}
+          </div>
+          <button
+            type="button"
+            onClick={showPrevious}
+            className="miniapp-touch-target inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--miniapp-border)] bg-[var(--miniapp-panel-bg)] text-[var(--tg-hint-color)] hover:text-[var(--tg-text-color)]"
+            aria-label="Previous featured service"
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={showNext}
+            className="miniapp-touch-target inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--miniapp-border)] bg-[var(--miniapp-panel-bg)] text-[var(--tg-hint-color)] hover:text-[var(--tg-text-color)]"
+            aria-label="Next featured service"
+          >
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
+          <Link to="/miniapp/services" className="hidden text-sm font-black text-[var(--tg-button-color)] sm:block">
+            See all
+          </Link>
+        </div>
       </div>
       <Link
         to={getMiniAppServiceTarget(primary)}
+        aria-label={`Open featured service: ${primary.title}`}
         className="group block overflow-hidden rounded-[8px] border border-[var(--miniapp-border-color)] bg-[var(--tg-section-bg-color)] p-5 text-[var(--tg-text-color)] shadow-[0_18px_46px_rgba(0,0,0,0.24)] transition active:scale-[0.99]"
       >
         <div className="flex items-start justify-between gap-4">
@@ -1063,6 +1097,7 @@ function FeaturedStrip() {
           <Link
             key={service.slug}
             to={getMiniAppServiceTarget(service)}
+            aria-label={`Open featured service: ${service.title}`}
             className="rounded-[24px] bg-[var(--tg-section-bg-color)] p-3 text-center text-[var(--tg-text-color)] transition active:scale-[0.98]"
           >
             <ServiceLogo service={service} size="md" className="mx-auto" />
