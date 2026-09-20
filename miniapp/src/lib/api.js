@@ -1,3 +1,5 @@
+import { buildRequestDedupKey, createRequestDeduper } from './requestDeduper.js';
+
 const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = RAW_API_BASE_URL.replace(/\/$/, '');
 const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_REQUEST_TIMEOUT_MS || 15000);
@@ -8,6 +10,7 @@ const LEGACY_SESSION_TOKEN_STORAGE_KEY = 'slipcraft_api_session';
 const ORGANIZATION_PREFERENCE_KEY = 'transferly.selected-organization-id';
 const SAFE_RETRY_METHODS = new Set(['GET', 'HEAD']);
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const safeReadRequestDeduper = createRequestDeduper();
 let lastApiFailure = null;
 let lastApiSuccess = null;
 let sessionToken = null;
@@ -291,6 +294,7 @@ export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', options.responseType === 'blob' ? 'text/csv,application/json' : 'application/json');
   headers.set('X-Transferly-Client', 'telegram-miniapp');
+
   const selectedOrganizationId = getSelectedOrganizationId();
   if (selectedOrganizationId && !headers.has('X-Organization-Id')) {
     headers.set('X-Organization-Id', selectedOrganizationId);
@@ -312,124 +316,151 @@ export async function apiRequest(path, options = {}) {
   }
 
   const method = getRequestMethod(options);
-  const retryAttempts = Number.isFinite(Number(retries))
-    ? Math.max(0, Number(retries))
-    : (SAFE_RETRY_METHODS.has(method) ? API_SAFE_RETRY_ATTEMPTS : 0);
-  const requestId = headers.get('X-Request-Id');
-  const overallStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  let response;
+  const dedupKey = SAFE_RETRY_METHODS.has(method)
+    ? buildRequestDedupKey({
+        method,
+        url: buildUrl(path),
+        headers
+      })
+    : null;
 
-  for (let attempt = 0; attempt <= retryAttempts; attempt += 1) {
-    const requestSignal = createRequestSignal(parentSignal);
-    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const executeRequest = async () => {
+    const retryAttempts = Number.isFinite(Number(retries))
+      ? Math.max(0, Number(retries))
+      : (SAFE_RETRY_METHODS.has(method) ? API_SAFE_RETRY_ATTEMPTS : 0);
+    const requestId = headers.get('X-Request-Id');
+    const overallStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    let response;
 
-    try {
-      response = await fetch(buildUrl(path), {
-        ...fetchOptions,
-        headers,
-        body,
-        signal: requestSignal.signal
-      });
-    } catch (error) {
-      const timedOut = requestSignal.didTimeout();
-      requestSignal.cleanup();
+    for (let attempt = 0; attempt <= retryAttempts; attempt += 1) {
+      const requestSignal = createRequestSignal(parentSignal);
+      const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-      if (attempt < retryAttempts && !parentSignal?.aborted) {
+      try {
+        response = await fetch(buildUrl(path), {
+          ...fetchOptions,
+          headers,
+          body,
+          signal: requestSignal.signal
+        });
+      } catch (error) {
+        const timedOut = requestSignal.didTimeout();
+        requestSignal.cleanup();
+
+        if (attempt < retryAttempts && !parentSignal?.aborted) {
+          logApiFailure({
+            path,
+            method,
+            code: timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR',
+            requestId,
+            attempt,
+            retrying: true,
+            durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt
+          });
+          await sleep(getRetryDelay(attempt));
+          continue;
+        }
+
         logApiFailure({
           path,
           method,
           code: timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR',
           requestId,
           attempt,
-          retrying: true,
+          retrying: false,
           durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt
         });
-        await sleep(getRetryDelay(attempt));
-        continue;
+        throw createNetworkError(error, requestId, { timedOut });
+      }
+
+      requestSignal.cleanup();
+
+      if (
+        response.ok ||
+        !RETRYABLE_STATUS_CODES.has(response.status) ||
+        attempt >= retryAttempts ||
+        parentSignal?.aborted
+      ) {
+        break;
       }
 
       logApiFailure({
         path,
         method,
-        code: timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR',
+        status: response.status,
+        code: 'RETRYABLE_STATUS',
         requestId,
         attempt,
-        retrying: false,
-        durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt
+        retrying: true
       });
-      throw createNetworkError(error, requestId, { timedOut });
+      await sleep(getRetryDelay(attempt, response));
     }
 
-    requestSignal.cleanup();
+    const payload = response.ok && options.responseType === 'blob'
+      ? await response.blob()
+      : await parseJsonSafely(response);
+    const responseRequestId = response.headers.get('x-request-id') || payload?.requestId || requestId;
 
-    if (
-      response.ok ||
-      !RETRYABLE_STATUS_CODES.has(response.status) ||
-      attempt >= retryAttempts ||
-      parentSignal?.aborted
-    ) {
-      break;
+    if (!response.ok) {
+      const missingApiBaseUrl = shouldReportMissingProductionApi(path, response);
+      const message =
+        missingApiBaseUrl
+          ? 'Transferly API URL is not configured for this Mini App deployment.'
+          : payload?.error?.message || payload?.message || `Request failed with status ${response.status}`;
+      const error = new Error(message);
+      error.status = response.status;
+      error.payload = payload;
+      error.code = missingApiBaseUrl ? 'API_BASE_URL_MISSING' : payload?.error?.code || payload?.code || null;
+      error.retryAfter =
+        response.headers.get('retry-after') ||
+        payload?.retryAfter ||
+        payload?.error?.retryAfter ||
+        payload?.recovery?.retryAfter ||
+        null;
+      error.classification = payload?.classification || payload?.error?.classification || null;
+      error.retryable = Boolean(payload?.retryable ?? payload?.recovery?.retryable ?? false);
+      error.recovery = payload?.recovery || payload?.error?.recovery || null;
+      error.requestId = responseRequestId;
+      logApiFailure({
+        path,
+        method,
+        status: response.status,
+        code: error.code,
+        requestId: responseRequestId,
+        retrying: false
+      });
+      throw error;
     }
 
-    logApiFailure({
+    recordApiSuccess({
       path,
       method,
       status: response.status,
-      code: 'RETRYABLE_STATUS',
-      requestId,
-      attempt,
-      retrying: true
-    });
-    await sleep(getRetryDelay(attempt, response));
-  }
-
-  const payload = response.ok && options.responseType === 'blob'
-    ? await response.blob()
-    : await parseJsonSafely(response);
-  const responseRequestId = response.headers.get('x-request-id') || payload?.requestId || requestId;
-
-  if (!response.ok) {
-    const missingApiBaseUrl = shouldReportMissingProductionApi(path, response);
-    const message =
-      missingApiBaseUrl
-        ? 'Transferly API URL is not configured for this Mini App deployment.'
-        : payload?.error?.message || payload?.message || `Request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.status = response.status;
-    error.payload = payload;
-    error.code = missingApiBaseUrl ? 'API_BASE_URL_MISSING' : payload?.error?.code || payload?.code || null;
-    error.retryAfter =
-      response.headers.get('retry-after') ||
-      payload?.retryAfter ||
-      payload?.error?.retryAfter ||
-      payload?.recovery?.retryAfter ||
-      null;
-    error.classification = payload?.classification || payload?.error?.classification || null;
-    error.retryable = Boolean(payload?.retryable ?? payload?.recovery?.retryable ?? false);
-    error.recovery = payload?.recovery || payload?.error?.recovery || null;
-    error.requestId = responseRequestId;
-    logApiFailure({
-      path,
-      method,
-      status: response.status,
-      code: error.code,
       requestId: responseRequestId,
-      retrying: false
+      durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - overallStartedAt
     });
-    throw error;
+
+    return payload;
+  };
+
+  if (dedupKey) {
+    const pendingRequest = safeReadRequestDeduper.get(dedupKey);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
+
+    const requestPromise = executeRequest();
+    safeReadRequestDeduper.set(dedupKey, requestPromise);
+
+    try {
+      return await requestPromise;
+    } finally {
+      safeReadRequestDeduper.delete(dedupKey);
+    }
   }
 
-  recordApiSuccess({
-    path,
-    method,
-    status: response.status,
-    requestId: responseRequestId,
-    durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - overallStartedAt
-  });
-
-  return payload;
+  return executeRequest();
 }
-
 export function downloadAdminFinanceAnalyticsCsv(params = {}) {
   const query = new URLSearchParams(params).toString();
   return apiRequest(`/api/admin/finance/analytics.csv${query ? `?${query}` : ''}`, {
