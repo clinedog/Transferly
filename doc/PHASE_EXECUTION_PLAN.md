@@ -9,7 +9,7 @@
 
 ## EXECUTIVE SUMMARY
 
-This document drives completion of all 14 remaining phases (15-28) of the Transferly production upgrade plan outlined in `docs/mini.md`.
+This document drives completion of all 14 remaining phases (15-28) of the Transferly production upgrade plan outlined in `../docs/mini.md`.
 
 **Goal**: Deliver a production-ready, financially safe, reliable, responsive, accessible, observable, and testable financial platform.
 

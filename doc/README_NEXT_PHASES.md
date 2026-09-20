@@ -172,7 +172,7 @@ npm run lint --prefix miniapp && npm test --prefix miniapp && npm run build --pr
 
 ### Documentation
 - `docs/codex/design-system-guide.md` — Design reference
-- `docs/mini.md` — Original 2207-line specification
+- `../docs/mini.md` — Original 2207-line specification
 - `PHASE_EXECUTION_PLAN.md` — Master plan
 
 ## 💾 Git Workflow

@@ -1804,7 +1804,7 @@ test('mini app displays provider API error codes and request IDs', async ({ page
   await expect(page.getByText('Retry after 2s')).toBeVisible();
 });
 
-for (const width of [320, 360, 375, 390, 430]) {
+for (const width of [320, 360, 375, 390, 414, 430, 768, 1024, 1280, 1440]) {
   test(`mini app provider command center remains usable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await primeMiniAppUi(page);
@@ -1828,7 +1828,7 @@ test('mini app bottom navigation remains fixed while scrolling on small screens'
   await primeMiniAppUi(page);
   await mockTransferlyApi(page);
 
-  for (const width of [320, 360, 375, 390, 430]) {
+  for (const width of [320, 360, 375, 390, 414, 430, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/miniapp/services/paypal/activity', { waitUntil: 'commit', timeout: 15000 });
 

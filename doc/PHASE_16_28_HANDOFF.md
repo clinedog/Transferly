@@ -335,7 +335,7 @@ Always keep these open/bookmarked:
 3. **Phase Report Template** — `PHASE_15_COMPLETION_REPORT.md` (example format)
 4. **Component Catalog** — `miniapp/src/components/ui/ComponentStateCatalog.jsx`
 5. **Design Tokens** — `miniapp/src/components/ui/DesignTokens.jsx`
-6. **Mini App Architecture** — `docs/mini.md` (2200 lines, full specification)
+6. **Mini App Architecture** — `../docs/mini.md` (2200 lines, full specification)
 7. **API Code Style** — `.github/instructions/api.instructions.md`
 8. **MiniApp Code Style** — `.github/instructions/miniapp.instructions.md`
 
@@ -472,7 +472,7 @@ export function MyResponsiveCard() {
 ---
 
 **Good luck with Phase 16!**  
-**Questions?** Refer to `PHASE_EXECUTION_PLAN.md` or `docs/mini.md`
+**Questions?** Refer to `PHASE_EXECUTION_PLAN.md` or `../docs/mini.md`
 
 ---
 

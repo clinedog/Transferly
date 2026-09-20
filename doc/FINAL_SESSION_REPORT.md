@@ -293,7 +293,7 @@ This session successfully executed **Phase 15: Design System & Visual Quality** 
 ## Key Artifacts
 
 ### Reference Materials
-- `docs/mini.md` — Original 2207-line specification
+- `../docs/mini.md` — Original 2207-line specification
 - `PHASE_EXECUTION_PLAN.md` — Master plan (all phases)
 - `docs/codex/design-system-guide.md` — Design system reference
 - `miniapp/src/components/ui/ComponentStateCatalog.jsx` — State definitions
@@ -458,4 +458,3 @@ The Transferly production upgrade is on track. The design system is production-r
 **Date**: 2026-09-20  
 **Duration**: ~2 hours  
 **Next Checkpoint**: Phase 16 Completion (1 day)
-
