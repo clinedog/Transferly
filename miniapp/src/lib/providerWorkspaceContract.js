@@ -20,8 +20,23 @@ export const PROVIDER_OPERATION_STATUSES = Object.freeze([
   'unavailable'
 ]);
 
+export function normalizeProviderRuntimeStatus(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+export function isProviderReadinessReady(status) {
+  const normalized = normalizeProviderRuntimeStatus(status);
+  return ['live', 'ready', 'healthy', 'configured', 'authenticated', 'sandbox-ready', 'production-ready', 'webhook-ready', 'connected'].includes(normalized);
+}
+
 export function isProviderOperationImplemented(status) {
-  return status === 'live' || status === 'sandbox-ready' || status === 'preview';
+  const normalized = normalizeProviderRuntimeStatus(status);
+  return normalized === 'live' || normalized === 'sandbox-ready' || normalized === 'preview' || normalized === 'ready';
 }
 
 export function normalizeProviderCapability(value) {

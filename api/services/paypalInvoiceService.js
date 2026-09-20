@@ -576,6 +576,10 @@ async function cancelInvoice(input) {
 }
 
 async function releaseInvoiceFunds(input) {
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+  if (reason.length < 3) {
+    throw new AppError(400, 'INVOICE_RELEASE_REASON_REQUIRED', 'A reason is required to release invoice funds.');
+  }
   const invoice = await invoiceRepository.findByIdentifier(input.invoiceId);
   if (!invoice) {
     throw new AppError(404, 'INVOICE_NOT_FOUND', 'Invoice not found.');
@@ -618,7 +622,7 @@ async function releaseInvoiceFunds(input) {
     entityId: invoice.id,
     metadata: {
       amountCents,
-      reason: input.reason || null,
+      reason,
       remainingReleasableCents,
       requestId: input.requestId || null
     }

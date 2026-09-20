@@ -107,6 +107,41 @@ async function upsert(data, client = db) {
 }
 
 async function deleteById(userId, client = db) {
+  const personalOrganizationId = `personal:${userId}`;
+
+  await client.run('DELETE FROM organization_memberships WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM organizations WHERE created_by = ? OR id = ?', [userId, personalOrganizationId]);
+  await client.run('DELETE FROM auth_credentials WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM auth_sessions WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM notifications WHERE user_id = ?', [userId]);
+  await client.run(
+    `DELETE FROM telegram_command_logs
+     WHERE telegram_user_id IN (
+       SELECT telegram_user_id FROM telegram_accounts WHERE user_id = ?
+     )`,
+    [userId]
+  );
+  await client.run('DELETE FROM telegram_accounts WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM email_dispatches WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM referral_events WHERE referrer_user_id = ? OR referred_user_id = ?', [userId, userId]);
+  await client.run('DELETE FROM top_up_orders WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM receipts WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM payouts WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM invoices WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM generated_assets WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM idempotency_records WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM orders WHERE user_id = ?', [userId]);
+  await client.run(
+    `DELETE FROM order_events
+     WHERE order_id IN (SELECT id FROM orders WHERE user_id = ?)`,
+    [userId]
+  );
+  await client.run('DELETE FROM points_funding_requests WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM points_transactions WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM point_reservations WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM risk_flags WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM profiles WHERE user_id = ?', [userId]);
+  await client.run('DELETE FROM wallets WHERE user_id = ?', [userId]);
   await client.run('DELETE FROM users WHERE id = ?', [userId]);
 }
 

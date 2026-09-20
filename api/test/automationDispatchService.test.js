@@ -61,6 +61,7 @@ test('dispatch is idempotent and does not execute a handler twice', async () => 
 
 test('dispatch records skipped execution when an action handler is unavailable', async () => {
   let update;
+  let auditEntry;
   const result = await automationDispatchService.dispatch({
     event: { trigger: 'INVOICE_PAID', eventId: 'evt-2', amount: 150 },
     repository: { async list() { return [rule({ action: 'SEND_RECEIPT' })]; } },
@@ -68,10 +69,31 @@ test('dispatch records skipped execution when an action handler is unavailable',
       async findByIdempotencyKey() { return null; },
       async create(data) { return { id: 'execution-2', ...data }; },
       async update(_id, data) { update = data; return data; }
-    }
+    },
+    audit: { async log(entry) { auditEntry = entry; } }
   });
 
   assert.equal(result.executions.length, 1);
   assert.equal(update.status, 'SKIPPED');
   assert.equal(update.result.reason, 'handler_not_configured');
+  assert.equal(auditEntry.action, 'automation.execution_skipped');
+});
+
+test('dispatch audits failed action executions without retrying them implicitly', async () => {
+  let auditEntry;
+  const result = await automationDispatchService.dispatch({
+    event: { trigger: 'INVOICE_PAID', eventId: 'evt-3', amount: 150 },
+    repository: { async list() { return [rule()]; } },
+    executionRepository: {
+      async findByIdempotencyKey() { return null; },
+      async create(data) { return { id: 'execution-3', ...data }; },
+      async update(_id, data) { return data; }
+    },
+    actionHandlers: { NOTIFY_ADMIN: async () => { throw new Error('delivery unavailable'); } },
+    audit: { async log(entry) { auditEntry = entry; } }
+  });
+
+  assert.equal(result.executions[0].status, 'FAILED');
+  assert.equal(auditEntry.action, 'automation.execution_failed');
+  assert.equal(auditEntry.metadata.error, 'delivery unavailable');
 });

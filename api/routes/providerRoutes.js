@@ -66,7 +66,7 @@ router.get('/:provider/lanes', asyncHandler(listProviderLanesController));
 router.get('/:provider/lanes/:laneId', asyncHandler(getProviderLaneController));
 router.get('/:provider/invoices', asyncHandler(listProviderInvoicesController));
 router.post('/:provider/invoices/preview', asyncHandler(previewProviderInvoiceController));
-router.post('/:provider/invoices', asyncHandler(createProviderInvoiceController));
+router.post('/:provider/invoices', requireIdempotencyKey, asyncHandler(createProviderInvoiceController));
 router.get('/:provider/payouts', asyncHandler(listProviderPayoutsController));
 router.post('/:provider/payouts/preview', asyncHandler(previewProviderPayoutController));
 router.post(

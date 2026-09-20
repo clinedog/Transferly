@@ -192,6 +192,113 @@ async function listPaymentTransactions(filters = {}) {
   return { data: await paymentProviderTransactionRepository.list(filters) };
 }
 
+async function getAnalytics({ period = '30d', from, to } = {}) {
+  const days = { today: 1, '7d': 7, '30d': 30, '90d': 90 }[period] || 30;
+  const since = period === 'custom' && from ? new Date(from).toISOString() : new Date(Date.now() - days * 86400000).toISOString();
+  const until = period === 'custom' && to ? new Date(to).toISOString() : new Date().toISOString();
+  const range = 'created_at >= ? AND created_at < ?';
+  const [ledger, payments, providerRows, funding, issues, payouts, invoices] = await Promise.all([
+    db.get(`
+      SELECT
+        COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS money_in,
+        COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS money_out,
+        COUNT(*) AS transaction_count
+      FROM points_transactions WHERE ${range}
+    `, [since, until]),
+    db.get(`
+      SELECT
+        COUNT(*) AS count,
+        COALESCE(SUM(amount_minor), 0) AS volume,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('success', 'succeeded', 'completed', 'paid') THEN 1 ELSE 0 END), 0) AS successful,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('failed', 'rejected', 'cancelled', 'canceled') THEN 1 ELSE 0 END), 0) AS failed
+      FROM payment_provider_transactions WHERE ${range}
+    `, [since, until]),
+    db.all(`
+      SELECT provider, COUNT(*) AS count, COALESCE(SUM(amount_minor), 0) AS volume,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('success', 'succeeded', 'completed', 'paid') THEN 1 ELSE 0 END), 0) AS successful,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('failed', 'rejected', 'cancelled', 'canceled') THEN 1 ELSE 0 END), 0) AS failed,
+        COALESCE(SUM(CASE WHEN json_valid(metadata_json) THEN CAST(json_extract(metadata_json, '$.fee_minor') AS INTEGER) ELSE 0 END), 0) AS fees,
+        AVG(CASE WHEN transaction_time IS NOT NULL THEN MAX(0, (julianday(updated_at) - julianday(transaction_time)) * 86400000) END) AS average_latency_ms
+      FROM payment_provider_transactions
+      WHERE ${range}
+      GROUP BY provider
+      ORDER BY volume DESC
+    `, [since, until]),
+    db.get(`
+      SELECT
+        COUNT(*) AS count,
+        COALESCE(SUM(expected_amount_minor), 0) AS volume,
+        COALESCE(SUM(CASE WHEN status = 'POINTS_CREDITED' THEN 1 ELSE 0 END), 0) AS collected,
+        COALESCE(SUM(CASE WHEN status IN ('PAYMENT_REPORTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION', 'MANUAL_REVIEW') THEN 1 ELSE 0 END), 0) AS pending
+      FROM points_funding_requests WHERE ${range}
+    `, [since, until]),
+    db.get(`
+      SELECT COUNT(*) AS count
+      FROM payment_ops_issues
+      WHERE status NOT IN ('RESOLVED', 'IGNORED_WITH_REASON') AND ${range}
+    `, [since, until]),
+    db.get(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents), 0) AS volume,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('completed', 'paid', 'success', 'succeeded') THEN 1 ELSE 0 END), 0) AS successful,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('failed', 'rejected', 'cancelled', 'canceled') THEN 1 ELSE 0 END), 0) AS failed
+      FROM payouts WHERE ${range}
+    `, [since, until]),
+    db.get(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(amount_cents), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('paid', 'completed', 'success', 'succeeded') THEN amount_cents ELSE 0 END), 0) AS collected,
+        COALESCE(SUM(CASE WHEN lower(status) IN ('sent', 'created', 'pending', 'unpaid') THEN amount_cents ELSE 0 END), 0) AS outstanding,
+        COALESCE(SUM(CASE WHEN due_date < ? AND lower(status) NOT IN ('paid', 'completed', 'cancelled', 'canceled') THEN amount_cents ELSE 0 END), 0) AS overdue
+      FROM invoices WHERE ${range}
+    `, [until, since, until])
+  ]);
+  const paymentCount = Number(payments?.count || 0);
+  return {
+    period,
+    since,
+    until,
+    money_in_points: Number(ledger?.money_in || 0),
+    money_out_points: Number(ledger?.money_out || 0),
+    net_flow_points: Number(ledger?.money_in || 0) - Number(ledger?.money_out || 0),
+    ledger_transaction_count: Number(ledger?.transaction_count || 0),
+    payment_volume_minor: Number(payments?.volume || 0),
+    payment_count: paymentCount,
+    payment_success_count: Number(payments?.successful || 0),
+    payment_failure_count: Number(payments?.failed || 0),
+    payment_success_rate: paymentCount ? Number(payments.successful || 0) / paymentCount : null,
+    payment_average_value_minor: paymentCount ? Number(payments.volume || 0) / paymentCount : 0,
+    provider_distribution: providerRows.map((row) => ({
+      provider: row.provider,
+      count: Number(row.count || 0),
+      volume_minor: Number(row.volume || 0),
+      successful: Number(row.successful || 0),
+      failed: Number(row.failed || 0),
+      success_rate: Number(row.count || 0) ? Number(row.successful || 0) / Number(row.count) : null,
+      fees_minor: Number(row.fees || 0)
+      ,
+      average_latency_ms: row.average_latency_ms == null ? null : Number(row.average_latency_ms)
+    })),
+    funding_volume_minor: Number(funding?.volume || 0),
+    funding_count: Number(funding?.count || 0),
+    funding_collected_count: Number(funding?.collected || 0),
+    funding_pending_count: Number(funding?.pending || 0),
+    open_payment_issues: Number(issues?.count || 0)
+    ,
+    payout_volume_minor: Number(payouts?.volume || 0),
+    payout_count: Number(payouts?.count || 0),
+    payout_success_count: Number(payouts?.successful || 0),
+    payout_failure_count: Number(payouts?.failed || 0),
+    payout_success_rate: Number(payouts?.count || 0) ? Number(payouts.successful || 0) / Number(payouts.count) : null,
+    payout_average_value_minor: Number(payouts?.count || 0) ? Number(payouts.volume || 0) / Number(payouts.count) : 0,
+    invoice_count: Number(invoices?.count || 0),
+    invoice_revenue_minor: Number(invoices?.revenue || 0),
+    invoice_collected_minor: Number(invoices?.collected || 0),
+    invoice_outstanding_minor: Number(invoices?.outstanding || 0),
+    invoice_overdue_minor: Number(invoices?.overdue || 0)
+    ,
+    invoice_average_value_minor: Number(invoices?.count || 0) ? Number(invoices.revenue || 0) / Number(invoices.count) : 0
+  };
+}
+
 module.exports = {
   financeOpsService: {
     getOverview,
@@ -199,5 +306,6 @@ module.exports = {
     listPaymentTransactions,
     listReconciliationAlerts,
     listTransactions
+    ,getAnalytics
   }
 };

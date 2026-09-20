@@ -6,6 +6,7 @@ const {
   getInvoiceTimelineController,
   getInvoiceController,
   listInvoicesController,
+  listPaymentLinksController,
   refreshInvoiceController,
   sendInvoiceReminderController,
   cancelInvoiceAutoRemindersController,
@@ -14,20 +15,23 @@ const {
 } = require('../controllers/invoiceController');
 const { asyncHandler } = require('../middleware/asyncHandler');
 const { requireAuthenticatedUser } = require('../middleware/authenticateRequest');
+const { requireIdempotencyKey } = require('../middleware/requireIdempotencyKey');
 const { requireApiKeyScope } = require('../middleware/requireApiKeyScope');
+const { financialRateLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
 
 router.use(requireAuthenticatedUser);
 router.use(requireApiKeyScope('invoices'));
-router.post('/', asyncHandler(createInvoiceController));
+router.post('/', financialRateLimiter, requireIdempotencyKey, asyncHandler(createInvoiceController));
 router.post('/preview', asyncHandler(previewInvoiceController));
+router.get('/payment-links', asyncHandler(listPaymentLinksController));
 router.get('/:id/timeline', asyncHandler(getInvoiceTimelineController));
-router.post('/:id/refresh', asyncHandler(refreshInvoiceController));
-router.post('/:id/remind', asyncHandler(sendInvoiceReminderController));
-router.post('/:id/cancel-reminders', asyncHandler(cancelInvoiceAutoRemindersController));
-router.post('/:id/qr', asyncHandler(generateInvoiceQrController));
-router.post('/:id/cancel', asyncHandler(cancelInvoiceController));
+router.post('/:id/refresh', requireIdempotencyKey, asyncHandler(refreshInvoiceController));
+router.post('/:id/remind', requireIdempotencyKey, asyncHandler(sendInvoiceReminderController));
+router.post('/:id/cancel-reminders', requireIdempotencyKey, asyncHandler(cancelInvoiceAutoRemindersController));
+router.post('/:id/qr', requireIdempotencyKey, asyncHandler(generateInvoiceQrController));
+router.post('/:id/cancel', requireIdempotencyKey, asyncHandler(cancelInvoiceController));
 router.get('/:id', asyncHandler(getInvoiceController));
 router.get('/', asyncHandler(listInvoicesController));
 

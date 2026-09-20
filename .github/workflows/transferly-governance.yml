@@ -39,17 +39,26 @@ jobs:
       - name: Validate shared Copilot skills
         run: npm run validate:skills
 
+      - name: Scan secrets and browser artifacts
+        run: node scripts/scan-secrets.js --history --history-commits=50
+
       - name: Install API dependencies
         run: npm ci --prefix api
 
       - name: Install Mini App dependencies
         run: npm ci --prefix miniapp
 
+      - name: Install Bot dependencies
+        run: npm ci --prefix bot
+
       - name: Run API production readiness gate
         run: npm run production:check --prefix api
 
       - name: Run API lint
         run: npm run lint --prefix api
+
+      - name: Run Bot tests
+        run: npm test --prefix bot
 
       - name: Run Mini App lint
         run: npm run lint --prefix miniapp

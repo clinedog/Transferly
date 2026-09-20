@@ -31,6 +31,30 @@ const stateTone = {
     title: 'Done',
     description: 'Your action was completed.'
   },
+  processing: {
+    icon: Loader2,
+    iconClassName: 'motion-safe:animate-spin text-[var(--tg-button-color)]',
+    title: 'Processing',
+    description: 'The financial action is in progress. Transferly is waiting for provider confirmation.'
+  },
+  unknown: {
+    icon: AlertCircle,
+    iconClassName: 'text-slate-500',
+    title: 'State is still unknown',
+    description: 'Transferly is waiting on authoritative provider or ledger confirmation before this action is marked complete.'
+  },
+  reconciling: {
+    icon: RefreshCw,
+    iconClassName: 'motion-safe:animate-spin text-amber-500',
+    title: 'Reconciliation required',
+    description: 'This transaction needs review because the provider outcome is not yet confirmed.'
+  },
+  reconciliation: {
+    icon: RefreshCw,
+    iconClassName: 'motion-safe:animate-spin text-amber-500',
+    title: 'Reconciliation required',
+    description: 'This transaction needs review because the provider outcome is not yet confirmed.'
+  },
   error: {
     icon: AlertCircle,
     iconClassName: 'text-red-500',
@@ -81,7 +105,7 @@ const stateTone = {
   }
 };
 
-const alertTones = new Set(['error', 'offline', 'unavailable', 'rate-limited', 'forbidden', 'auth', 'provider', 'config']);
+const alertTones = new Set(['error', 'offline', 'unavailable', 'rate-limited', 'forbidden', 'auth', 'provider', 'config', 'unknown', 'reconciling', 'reconciliation']);
 
 export function MiniAppState({
   tone = 'loading',

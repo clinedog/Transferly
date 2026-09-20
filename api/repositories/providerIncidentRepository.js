@@ -14,6 +14,8 @@ function map(row) {
     impact: row.impact,
     evidence: parseJson(row.evidence_json, {}),
     actions: parseJson(row.actions_json, []),
+    runbookKey: row.runbook_key,
+    ownerRole: row.owner_role,
     detectedAt: row.detected_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at,
@@ -52,18 +54,18 @@ async function upsertActive(data, client = db) {
   const now = new Date().toISOString();
   if (existing) {
     await client.run(
-      `UPDATE provider_incidents SET affected_operation = ?, impact = ?, evidence_json = ?, actions_json = ?, updated_at = ?
+      `UPDATE provider_incidents SET affected_operation = ?, impact = ?, evidence_json = ?, actions_json = ?, runbook_key = ?, owner_role = ?, updated_at = ?
        WHERE id = ?`,
-      [data.affectedOperation, data.impact, serializeJson(data.evidence), serializeJson(data.actions), now, existing.id]
+      [data.affectedOperation, data.impact, serializeJson(data.evidence), serializeJson(data.actions), data.runbookKey, data.ownerRole, now, existing.id]
     );
     return findById(existing.id, client);
   }
   const id = data.id || randomUUID();
   await client.run(
     `INSERT INTO provider_incidents
-      (id, provider, status, affected_operation, impact, evidence_json, actions_json, detected_at, updated_at)
-     VALUES (?, ?, 'DETECTED', ?, ?, ?, ?, ?, ?)`,
-    [id, data.provider, data.affectedOperation, data.impact, serializeJson(data.evidence), serializeJson(data.actions), data.detectedAt || now, now]
+      (id, provider, status, affected_operation, impact, evidence_json, actions_json, runbook_key, owner_role, detected_at, updated_at)
+     VALUES (?, ?, 'DETECTED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, data.provider, data.affectedOperation, data.impact, serializeJson(data.evidence), serializeJson(data.actions), data.runbookKey, data.ownerRole, data.detectedAt || now, now]
   );
   return findById(id, client);
 }

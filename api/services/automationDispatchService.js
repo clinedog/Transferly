@@ -73,6 +73,14 @@ async function dispatch({
           result: { action: rule.action, state: 'SKIPPED', reason: 'handler_not_configured' },
           completedAt: new Date().toISOString()
         });
+        await audit.log({
+          actorType: 'automation',
+          actorId: rule.id,
+          action: 'automation.execution_skipped',
+          entityType: 'automation_execution',
+          entityId: execution.id,
+          metadata: { trigger: event.trigger, action: rule.action, reason: 'handler_not_configured' }
+        });
         executions.push(skipped);
         continue;
       }
@@ -96,6 +104,14 @@ async function dispatch({
         status: 'FAILED',
         result: { action: rule.action, state: 'FAILED', error: error.message },
         completedAt: new Date().toISOString()
+      });
+      await audit.log({
+        actorType: 'automation',
+        actorId: rule.id,
+        action: 'automation.execution_failed',
+        entityType: 'automation_execution',
+        entityId: execution.id,
+        metadata: { trigger: event.trigger, action: rule.action, error: error.message }
       });
       executions.push(failed);
     }

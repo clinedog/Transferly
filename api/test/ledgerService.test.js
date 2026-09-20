@@ -11,6 +11,7 @@ process.env.REDIS_URL = 'redis://127.0.0.1:6379';
 process.env.PAYPAL_CLIENT_ID = 'ledger-service-client';
 process.env.PAYPAL_CLIENT_SECRET = 'paypal-client-secret';
 process.env.PAYPAL_WEBHOOK_ID = 'ledger-service-webhook';
+process.env.PAYOUT_AUTO_APPROVAL_MAX_CENTS = '100000';
 
 const { close, db, transaction } = require('../db');
 const { migrate } = require('../db/migrate');
@@ -310,4 +311,10 @@ test('approved payout reservation commits with its durable processing event', as
   assert.equal(outbox.status, 'pending');
   assert.equal(JSON.parse(outbox.payload_json).payoutId, payout.payout_id);
   assert.equal(outbox.correlation_id, payout.payout_id);
+  const autoApprovalAudit = await db.get(
+    "SELECT action, metadata_json FROM audit_logs WHERE entity_type = 'payout' AND entity_id = ? AND action = 'payout.auto_approved'",
+    [payout.payout_id]
+  );
+  assert.ok(autoApprovalAudit);
+  assert.equal(JSON.parse(autoApprovalAudit.metadata_json).processing_event, `payout:process:${payout.payout_id}`);
 });

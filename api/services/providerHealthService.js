@@ -63,18 +63,40 @@ function lastWebhookTimestamp(webhooks) {
   }, null);
 }
 
-async function listActiveIssues(provider) {
-  const batches = await Promise.all(
-    ACTIVE_ISSUE_STATUSES.map((status) => paymentOpsIssueService.listIssues({ provider, status, limit: 100 }))
-  );
-  return batches.flat();
+function buildHealthCheckFailure(provider, error) {
+  return {
+    provider: provider.key,
+    display_name: provider.display_name,
+    provider_status: provider.status,
+    score: 0,
+    status: 'critical',
+    failed_webhooks: 0,
+    recent_webhooks: 0,
+    unresolved_issues: 0,
+    last_webhook_at: null,
+    reasons: [`Provider health data could not be read (${error.code || 'HEALTH_CHECK_FAILED'}).`],
+    next_actions: ['Verify database migrations and restore provider health data access before enabling financial execution.'],
+    health_check_error: error.code || 'HEALTH_CHECK_FAILED'
+  };
 }
 
-async function buildProviderHealth(provider) {
-  const [webhooks, issues] = await Promise.all([
-    webhookEventRepository.findMany({ provider: provider.key, limit: 50 }),
-    listActiveIssues(provider.key)
-  ]);
+async function buildProviderHealth(provider, {
+  webhookRepository = webhookEventRepository,
+  issueService = paymentOpsIssueService
+} = {}) {
+  let webhooks;
+  let issues;
+  try {
+    [webhooks, issues] = await Promise.all([
+      webhookRepository.findMany({ provider: provider.key, limit: 50 }),
+      Promise.all(
+        ACTIVE_ISSUE_STATUSES.map((status) => issueService.listIssues({ provider: provider.key, status, limit: 100 }))
+      ).then((batches) => batches.flat())
+    ]);
+  } catch (error) {
+    return buildHealthCheckFailure(provider, error);
+  }
+
   const scoring = scoreProvider({ provider, webhooks, issues });
   const nextActions = [...(provider.next_actions || [])];
 
@@ -128,8 +150,10 @@ async function getProviderHealth(providerKey) {
 module.exports = {
   providerHealthService: {
     getProviderHealth,
-    getProviderHealthReport
+    getProviderHealthReport,
+    buildProviderHealth
   },
   getProviderHealth,
-  getProviderHealthReport
+  getProviderHealthReport,
+  buildProviderHealth
 };

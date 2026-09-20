@@ -149,6 +149,11 @@ test('points reconciliation detects credited funding requests without matching p
 test('points reconciliation detects duplicate funding purchase credits', async () => {
   await createUser('recon-duplicate-funding-credit');
   const request = await createSubmittedFundingRequest('recon-duplicate-funding-credit');
+  await pointsFundingService.assignFundingRequest({
+    requestId: request.id,
+    adminActorId: 'recon-manager',
+    assignedTo: 'recon-admin'
+  });
   await pointsFundingService.approveFundingRequest({
     requestId: request.id,
     adminActorId: 'recon-admin',

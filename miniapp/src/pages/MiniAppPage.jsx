@@ -124,6 +124,8 @@ import {
   getServiceEstimatedCost,
   getServicePreview
 } from '../lib/servicesCatalog';
+import { summarizeOperationalStatus } from '../lib/operationalStatus';
+import { buildRecommendedActions } from '../lib/operationalActions';
 import {
   getServiceStatusLabel,
   isServiceAvailable,
@@ -774,7 +776,7 @@ function getMiniAppLaunchTarget(service) {
   return service.launchTo || `/miniapp/services/${service.slug}`;
 }
 
-function HeroPanel({ profile, telegram, receipts, topUpOrders }) {
+function HeroPanel({ profile, telegram, receipts, topUpOrders, paymentIssues = [] }) {
   const firstName = telegram.user?.first_name || profile?.name?.split(' ')?.[0] || 'Operator';
   const latestOrder = topUpOrders[0];
   const balance = Number(profile?.points || 0);
@@ -816,6 +818,12 @@ function HeroPanel({ profile, telegram, receipts, topUpOrders }) {
     { label: 'Track', icon: History, active: receipts.length > 0 || topUpOrders.length > 0 },
     { label: 'Resolve', icon: ShieldCheck, active: telegram.available }
   ];
+  const pendingOrders = Array.isArray(topUpOrders)
+    ? topUpOrders.filter((order) => !['completed', 'released', 'success', 'successful'].includes(String(order?.status || '').toLowerCase())).length
+    : 0;
+  const issueCount = Array.isArray(paymentIssues) ? paymentIssues.length : 0;
+  const operationalStatus = summarizeOperationalStatus({ paymentIssues, topUpOrders });
+  const recommendedActions = buildRecommendedActions({ paymentIssues, topUpOrders });
 
   // Enable viewport-based prefetching on mount for better mobile/keyboard coverage.
   useEffect(() => {
@@ -894,6 +902,50 @@ function HeroPanel({ profile, telegram, receipts, topUpOrders }) {
                   </Link>
                 );
               })}
+            </div>
+
+            <div className="mt-5 rounded-[22px] border border-white/10 bg-black/14 p-3 backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/58">Operations status</p>
+                  <p className="mt-1 text-base font-black tracking-[-0.03em] text-white">{operationalStatus.label}</p>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${operationalStatus.tone === 'amber' ? 'bg-amber-400/15 text-amber-100' : 'bg-emerald-400/15 text-emerald-100'}`}>
+                  {operationalStatus.tone === 'amber' ? 'Watch' : 'Healthy'}
+                </span>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-white/70">{operationalStatus.detail}</p>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-left">
+                <div className="rounded-[16px] bg-white/[0.06] p-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Alerts</p>
+                  <p className="mt-1 text-sm font-black text-white">{issueCount}</p>
+                </div>
+                <div className="rounded-[16px] bg-white/[0.06] p-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Orders</p>
+                  <p className="mt-1 text-sm font-black text-white">{pendingOrders}</p>
+                </div>
+                <Link to="/miniapp/support?from=home" className="rounded-[16px] bg-white/[0.06] p-2 text-left transition hover:bg-white/[0.1]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Support</p>
+                  <p className="mt-1 text-sm font-black text-white">Open</p>
+                </Link>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/58">Recommended actions</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {recommendedActions.map((action) => (
+                    <Link
+                      key={action.title}
+                      to={action.to}
+                      className={`rounded-[16px] border p-2.5 text-left transition hover:bg-white/[0.08] ${action.tone === 'warn' ? 'border-amber-300/30 bg-amber-400/10' : action.tone === 'accent' ? 'border-sky-300/30 bg-sky-400/10' : 'border-white/10 bg-white/[0.04]'}`}
+                    >
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Next</p>
+                      <p className="mt-1 text-sm font-black text-white">{action.title}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-white/68">{action.description}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

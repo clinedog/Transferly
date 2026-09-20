@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const ignoredDirectories = new Set([
@@ -11,7 +12,8 @@ const ignoredDirectories = new Set([
   'data',
   '.cache',
   'playwright-report',
-  'test-results'
+  'test-results',
+  'paypal_mirror'
 ]);
 const ignoredFiles = new Set([
   'package-lock.json',
@@ -22,6 +24,10 @@ const ignoredFiles = new Set([
   '.env.test.local',
   '.env.production.local',
   '.env.example'
+]);
+const forbiddenArtifactNames = new Set([
+  'cookies.txt',
+  'httrack_cookies.txt'
 ]);
 const ignoredExtensions = new Set([
   '.png',
@@ -65,7 +71,8 @@ const allowedTestLiterals = [
   'points-funding-secret',
   'points-reconciliation-secret',
   'jwt-secret-1234-1234-1234-1234',
-  'payout-reconciliation-secret'
+  'payout-reconciliation-secret',
+  'tl_invite_test_token_123456789'
 ];
 
 const patterns = [
@@ -94,6 +101,12 @@ function shouldIgnore(relativePath) {
   return ignoredExtensions.has(path.extname(relativePath).toLowerCase());
 }
 
+function isForbiddenArtifact(relativePath) {
+  const baseName = path.basename(relativePath).toLowerCase();
+  return forbiddenArtifactNames.has(baseName)
+    || /(?:cookie|session[-_ ]?export|browser[-_ ]?state)/i.test(baseName);
+}
+
 function walk(directory, files = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const absolutePath = path.join(directory, entry.name);
@@ -113,18 +126,43 @@ function walk(directory, files = []) {
   return files;
 }
 
+function trackedFiles() {
+  try {
+    return execFileSync('git', ['ls-files', '-z'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024
+    }).split('\0').filter(Boolean).map((relativePath) => path.join(rootDir, relativePath));
+  } catch (error) {
+    if (process.env.CI) {
+      throw new Error(`Unable to inspect the git index: ${error.message}`);
+    }
+    return [];
+  }
+}
+
 function isAllowedMatch(match) {
   return allowedTestLiterals.some((literal) => match.includes(literal));
 }
 
-const findings = [];
+function scanFile(filePath, findings) {
+  const relativePath = path.relative(rootDir, filePath);
+  if (shouldIgnore(relativePath)) return;
 
-for (const filePath of walk(rootDir)) {
+  if (isForbiddenArtifact(relativePath)) {
+    findings.push({
+      file: relativePath,
+      line: 1,
+      name: 'browser session artifact'
+    });
+    return;
+  }
+
   let text;
   try {
     text = fs.readFileSync(filePath, 'utf8');
   } catch (_error) {
-    continue;
+    return;
   }
 
   const lines = text.split(/\r?\n/);
@@ -133,7 +171,7 @@ for (const filePath of walk(rootDir)) {
       const match = line.match(pattern);
       if (match && !isAllowedMatch(line)) {
         findings.push({
-          file: path.relative(rootDir, filePath),
+          file: relativePath,
           line: index + 1,
           name
         });
@@ -142,12 +180,68 @@ for (const filePath of walk(rootDir)) {
   });
 }
 
-if (findings.length === 0) {
-  console.log('OK secret scan found no high-confidence committed secret patterns.');
-} else {
-  findings.forEach((finding) => {
-    console.log(`FAIL ${finding.file}:${finding.line} ${finding.name}`);
-  });
-  console.error(`Secret scan failed: ${findings.length} high-confidence finding(s).`);
-  process.exitCode = 1;
+function scanHistory(findings, commitCount = 50) {
+  let commits;
+  try {
+    commits = execFileSync('git', ['rev-list', `--max-count=${commitCount}`, 'HEAD'], {
+      cwd: rootDir,
+      encoding: 'utf8'
+    }).trim().split(/\s+/).filter(Boolean);
+  } catch (error) {
+    throw new Error(`Unable to inspect git history: ${error.message}`);
+  }
+
+  for (const commit of commits) {
+    const names = execFileSync('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commit], {
+      cwd: rootDir,
+      encoding: 'utf8'
+    }).split(/\r?\n/).filter(Boolean);
+    for (const relativePath of names) {
+      let text;
+      try {
+        text = execFileSync('git', ['show', `${commit}:${relativePath}`], {
+          cwd: rootDir,
+          encoding: 'utf8',
+          maxBuffer: 2 * 1024 * 1024
+        });
+      } catch (_error) {
+        continue;
+      }
+      text.split(/\r?\n/).forEach((line, index) => {
+        for (const { name, pattern } of patterns) {
+          if (pattern.test(line) && !isAllowedMatch(line)) {
+            findings.push({ file: `${commit}:${relativePath}`, line: index + 1, name: `${name} in history` });
+          }
+          pattern.lastIndex = 0;
+        }
+      });
+    }
+  }
 }
+
+function scan({ includeHistory = false, historyCommits = 50 } = {}) {
+  const findings = [];
+  const files = new Set([...walk(rootDir), ...trackedFiles()]);
+  for (const filePath of files) scanFile(filePath, findings);
+  if (includeHistory) scanHistory(findings, historyCommits);
+  return findings;
+}
+
+if (require.main === module) {
+  const includeHistory = process.argv.includes('--history');
+  const historyArg = process.argv.find((arg) => arg.startsWith('--history-commits='));
+  const historyCommits = historyArg ? Number(historyArg.split('=')[1]) : 50;
+  const findings = scan({ includeHistory, historyCommits: Number.isFinite(historyCommits) ? historyCommits : 50 });
+
+  if (findings.length === 0) {
+    console.log(`OK secret scan found no high-confidence ${includeHistory ? 'working-tree or history ' : ''}secret patterns.`);
+  } else {
+    findings.forEach((finding) => {
+      console.log(`FAIL ${finding.file}:${finding.line} ${finding.name}`);
+    });
+    console.error(`Secret scan failed: ${findings.length} high-confidence finding(s).`);
+    process.exitCode = 1;
+  }
+}
+
+module.exports = { scan };

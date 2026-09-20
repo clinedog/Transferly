@@ -7,14 +7,27 @@ function buildRecoveryReadiness() {
   const databasePath = String(config.SQLITE_DATABASE_PATH || '');
   const databaseConfigured = Boolean(databasePath);
   const backupVerifiedAt = process.env.TRANSFERLY_BACKUP_RESTORE_VERIFIED_AT || null;
-  const backupLocationConfigured = Boolean(process.env.TRANSFERLY_BACKUP_LOCATION);
-  const status = !databaseConfigured
+  const backupLocation = String(process.env.TRANSFERLY_BACKUP_LOCATION || '').trim();
+  const backupLocationConfigured = Boolean(backupLocation);
+  const backupLastSuccessAt = process.env.TRANSFERLY_BACKUP_LAST_SUCCESS_AT || null;
+  const rpo = String(process.env.TRANSFERLY_BACKUP_RPO || '').trim();
+  const rto = String(process.env.TRANSFERLY_BACKUP_RTO || '').trim();
+  const restoreDate = parseDate(backupVerifiedAt);
+  const backupDate = parseDate(backupLastSuccessAt);
+  const evidenceMaxAgeHours = Number(process.env.TRANSFERLY_BACKUP_EVIDENCE_MAX_AGE_HOURS || 168);
+  const now = Date.now();
+  const databaseFilePresent = databaseConfigured && fs.existsSync(databasePath);
+  const restoreEvidenceFresh = Boolean(restoreDate && now - restoreDate.getTime() <= evidenceMaxAgeHours * 3600000);
+  const backupFresh = Boolean(backupDate && now - backupDate.getTime() <= evidenceMaxAgeHours * 3600000);
+  const status = !databaseConfigured || !databaseFilePresent
     ? 'FAIL'
-    : !backupLocationConfigured
+    : !backupLocationConfigured || !rpo || !rto
       ? 'NOT_CONFIGURED'
-      : !backupVerifiedAt
+      : !restoreDate || !backupDate
         ? 'VERIFICATION_REQUIRED'
-        : 'READY';
+        : !restoreEvidenceFresh || !backupFresh
+          ? 'STALE'
+          : 'READY';
 
   return {
     status,
@@ -22,25 +35,43 @@ function buildRecoveryReadiness() {
       engine: 'sqlite',
       configured: databaseConfigured,
       pathPresent: databaseConfigured,
-      filePresent: databaseConfigured && fs.existsSync(databasePath)
+      filePresent: databaseFilePresent
     },
     backup: {
+      location: backupLocation || null,
       locationConfigured: backupLocationConfigured,
+      lastSuccessAt: backupLastSuccessAt,
+      fresh: backupFresh,
       restoreVerifiedAt: backupVerifiedAt,
-      evidence: backupVerifiedAt ? 'operator-supplied restore verification timestamp' : null
+      restoreEvidenceFresh,
+      evidence: backupVerifiedAt ? 'operator-supplied restore verification timestamp' : null,
+      evidenceMaxAgeHours
     },
     targets: {
-      rpo: process.env.TRANSFERLY_BACKUP_RPO || 'Not configured',
-      rto: process.env.TRANSFERLY_BACKUP_RTO || 'Not configured'
+      rpo: rpo || 'Not configured',
+      rto: rto || 'Not configured'
     },
     nextActions: status === 'READY'
       ? []
-      : [
-        'Configure an approved backup location and retention policy.',
-        'Perform a controlled restore test and record TRANSFERLY_BACKUP_RESTORE_VERIFIED_AT.',
-        'Document RPO and RTO targets for the deployment.'
-      ]
+      : buildNextActions({ status, backupLocationConfigured, rpo, rto, restoreDate, backupDate, restoreEvidenceFresh, backupFresh })
   };
+}
+
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildNextActions({ status, backupLocationConfigured, rpo, rto, restoreDate, backupDate, restoreEvidenceFresh, backupFresh }) {
+  const actions = [];
+  if (status === 'FAIL') actions.push('Ensure the configured SQLite database path exists and is readable.');
+  if (!backupLocationConfigured) actions.push('Configure an approved backup location and retention policy.');
+  if (!rpo || !rto) actions.push('Document RPO and RTO targets for the deployment.');
+  if (!backupDate || !backupFresh) actions.push('Record a recent successful database backup timestamp.');
+  if (!restoreDate || !restoreEvidenceFresh) actions.push('Perform a controlled restore test and record a recent TRANSFERLY_BACKUP_RESTORE_VERIFIED_AT timestamp.');
+  if (status === 'VERIFICATION_REQUIRED' && actions.length === 0) actions.push('Complete controlled backup and restore verification.');
+  return actions;
 }
 
 module.exports = { recoveryReadinessService: { buildRecoveryReadiness } };

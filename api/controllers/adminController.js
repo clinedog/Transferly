@@ -28,6 +28,7 @@ const {
   adminFinanceAlertsQuerySchema,
   adminAuditLogsQuerySchema,
   adminFinanceTransactionsQuerySchema,
+  adminAnalyticsQuerySchema,
   adminPaymentTransactionsQuerySchema,
   listPaymentOpsIssuesQuerySchema,
   listInvoiceReminderConfigurationsQuerySchema,
@@ -616,6 +617,47 @@ async function getAdminFinanceOverviewController(_request, response) {
   response.json({ overview: await financeOpsService.getOverview() });
 }
 
+async function getAdminAnalyticsController(request, response) {
+  const query = adminAnalyticsQuerySchema.parse(request.query || {});
+  response.json({ analytics: await financeOpsService.getAnalytics(query) });
+}
+
+async function exportAdminAnalyticsController(request, response) {
+  const query = adminAnalyticsQuerySchema.parse(request.query || {});
+  const analytics = await financeOpsService.getAnalytics(query);
+  const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const rows = Object.entries(analytics).map(([key, value]) => `${escapeCsv(key)},${escapeCsv(value)}`);
+  response
+    .type('text/csv')
+    .set('Content-Disposition', `attachment; filename="transferly-finance-${query.period}.csv"`)
+    .send(['metric,value', ...rows].join('\n'));
+}
+
+async function exportAdminAnalyticsPdfController(request, response) {
+  const query = adminAnalyticsQuerySchema.parse(request.query || {});
+  const analytics = await financeOpsService.getAnalytics(query);
+  const { buildSimplePdf } = require('../utils/simplePdf');
+  const lines = [
+    'Transferly Financial Analytics',
+    `Period: ${query.period}`,
+    `Range: ${analytics.since} to ${analytics.until}`,
+    `Net flow points: ${analytics.net_flow_points}`,
+    `Payment volume minor: ${analytics.payment_volume_minor}`,
+    `Payment success rate: ${analytics.payment_success_rate == null ? 'N/A' : `${(analytics.payment_success_rate * 100).toFixed(1)}%`}`,
+    `Payout volume minor: ${analytics.payout_volume_minor}`,
+    `Payout success rate: ${analytics.payout_success_rate == null ? 'N/A' : `${(analytics.payout_success_rate * 100).toFixed(1)}%`}`,
+    `Invoice revenue minor: ${analytics.invoice_revenue_minor}`,
+    `Invoice outstanding minor: ${analytics.invoice_outstanding_minor}`,
+    `Invoice overdue minor: ${analytics.invoice_overdue_minor}`,
+    `Open payment issues: ${analytics.open_payment_issues}`,
+    'Generated from authoritative Transferly backend records.'
+  ];
+  response
+    .type('application/pdf')
+    .set('Content-Disposition', `attachment; filename="transferly-finance-${query.period}.pdf"`)
+    .send(Buffer.from(buildSimplePdf(lines), 'base64'));
+}
+
 async function listAdminAuditLogsController(request, response) {
   const query = adminAuditLogsQuerySchema.parse(request.query || {});
   response.json({ data: await auditLogService.list(query) });
@@ -1124,6 +1166,9 @@ module.exports = {
   getAdminFundingRequestController,
   getAdminFundingEvidenceController,
   getAdminFinanceOverviewController,
+  getAdminAnalyticsController,
+  exportAdminAnalyticsController,
+  exportAdminAnalyticsPdfController,
   listAdminAuditLogsController,
   getAdminUserRiskProfileController,
   getAdminUserFinanceProfileController,

@@ -15,6 +15,7 @@ const { slipcraftUserRoutes } = require('./slipcraftUserRoutes');
 const { webhookRoutes } = require('./webhookRoutes');
 const { marketplaceRoutes } = require('./marketplaceRoutes');
 const { walletLinkRoutes } = require('./walletLinkRoutes');
+const { clientTelemetryRoutes } = require('./clientTelemetryRoutes');
 const { mountPerProviderRoutes } = require('../providers/shared/mountProviderRoutes');
 const { logger } = require('../utils/logger');
 
@@ -42,6 +43,7 @@ function mountApiRoutes(app, prefix) {
   app.use(`${prefix}/admin`, adminRoutes);
   app.use(`${prefix}/marketplace`, marketplaceRoutes);
   app.use(`${prefix}/wallet-links`, walletLinkRoutes);
+  app.use(`${prefix}/client-telemetry`, clientTelemetryRoutes);
 }
 
 function registerRoutes(app) {

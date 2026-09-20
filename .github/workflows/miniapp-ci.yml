@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
     permissions:
       contents: read
       actions: write
@@ -24,6 +24,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+
+      - name: Install root release tooling
+        run: npm ci
 
       - name: Cache miniapp node modules
         uses: actions/cache@v4
@@ -53,11 +56,11 @@ jobs:
         run: npm --prefix miniapp exec playwright install --with-deps chromium
 
       - name: Serve built miniapp for Lighthouse
-        run: npx http-server miniapp/dist -p 5000 &
+        run: npm exec --no -- http-server miniapp/dist -p 5000 &
 
       - name: Run Lighthouse (performance & accessibility)
         run: |
-          npx -y lighthouse http://localhost:5000 --output=json --output-path=miniapp/lighthouse.json --quiet || true
+          npm exec --no -- lighthouse http://localhost:5000 --output=json --output-path=miniapp/lighthouse.json --quiet
 
       - name: Run Playwright tests
         run: npm run test:e2e --prefix miniapp

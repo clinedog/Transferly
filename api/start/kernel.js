@@ -21,6 +21,7 @@ const {
   buildCorsOptions,
   createRequestTimeoutMiddleware
 } = require('../core/config/httpPolicy');
+const { webhookRateLimiter } = require('../middleware/rateLimiters');
 const { buildJsonBodyParserOptions } = require('../core/webhooks/rawBodyCapture');
 const { logger } = require('../utils/logger');
 const { buildOpenApiDocument } = require('../openapi');
@@ -98,6 +99,7 @@ function configureHttpKernel(app) {
     logger.warn({ err }, 'Provider discovery failed (continuing without providers)');
   }
 
+  app.use('/webhooks', webhookRateLimiter);
   registerRoutes(app);
 
   const openApiHandler = (_request, response) => {

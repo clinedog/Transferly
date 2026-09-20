@@ -14,6 +14,11 @@ function validateRule({ trigger, action, condition = {} }) {
   if (condition.amount !== undefined && (!Number.isFinite(Number(condition.amount)) || Number(condition.amount) < 0)) {
     throw new AppError(400, 'AUTOMATION_CONDITION_INVALID', 'Condition amount must be a non-negative number.');
   }
+  for (const field of ['currency', 'provider', 'customer', 'status', 'country', 'risk']) {
+    if (condition[field] !== undefined && !String(condition[field]).trim()) {
+      throw new AppError(400, 'AUTOMATION_CONDITION_INVALID', `Condition ${field} must not be empty.`);
+    }
+  }
   return condition;
 }
 

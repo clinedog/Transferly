@@ -25,7 +25,7 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `npm run dev -- --host ${host} --port ${port}`,
+    command: `VITE_API_BASE_URL= VITE_API_REQUEST_TIMEOUT_MS=1000 VITE_API_SAFE_RETRY_ATTEMPTS=0 npm run dev -- --host ${host} --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000

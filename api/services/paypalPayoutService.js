@@ -17,6 +17,7 @@ const { riskService } = require('./riskService');
 const { payoutOutboxService } = require('./payoutOutboxService');
 const { providerOperationInboxService } = require('./providerOperationInboxService');
 const { RECOVERY_OUTCOME, providerOperationRecoveryService } = require('./providerOperationRecoveryService');
+const { decidePayoutApprovalPath } = require('./payoutPolicyService');
 const { AppError } = require('../utils/errors');
 const { ensurePositiveMoney, formatMoney, parseAmount } = require('../utils/money');
 const { PAYOUT_STATUS, RISK_DECISION, AUDIT_ACTOR_TYPE } = require('../utils/constants');
@@ -304,13 +305,20 @@ async function requestPayout(input) {
     amountCents,
     currencyCode: currency
   });
+  const approval = decidePayoutApprovalPath({
+    riskDecision: riskResult.decision,
+    riskFlags: riskResult.flags,
+    amountCents: pricing.totalDebitCents,
+    currencyCode: currency,
+    provider: 'paypal'
+  });
 
   const payoutId = randomUUID();
   const senderBatchId = `payout_${payoutId}`;
   const initialStatus =
-    riskResult.decision === RISK_DECISION.APPROVED
+    approval.autoApproved
       ? PAYOUT_STATUS.QUEUED
-      : riskResult.decision === RISK_DECISION.REVIEW
+      : approval.decision === 'MANUAL_REVIEW'
         ? PAYOUT_STATUS.PENDING_APPROVAL
         : PAYOUT_STATUS.DENIED;
 
@@ -337,6 +345,11 @@ async function requestPayout(input) {
           total_debit_cents: pricing.totalDebitCents,
           fee_fixed_cents: pricing.feeFixedCents,
           fee_percentage_bps: pricing.feePercentageBps
+        },
+        approval: {
+          decision: approval.decision,
+          reason: approval.reason,
+          details: approval.details
         }
       }
     }, client);
@@ -375,8 +388,22 @@ async function requestPayout(input) {
       }, client);
     }
 
-    if (riskResult.decision === RISK_DECISION.APPROVED) {
+    if (approval.autoApproved) {
       await payoutOutboxService.recordPayoutProcessingRequested(created.id, client);
+      await auditLogService.log({
+        actorType: AUDIT_ACTOR_TYPE.SYSTEM,
+        actorId: null,
+        action: 'payout.auto_approved',
+        entityType: 'payout',
+        entityId: created.id,
+        metadata: {
+          approval_decision: approval.decision,
+          approval_reason: approval.reason,
+          approval_details: approval.details,
+          reserved_amount_cents: pricing.totalDebitCents,
+          processing_event: `payout:process:${created.id}`
+        }
+      }, client);
     }
 
     return created;
@@ -391,7 +418,7 @@ async function requestPayout(input) {
 
   return {
     ...payoutTracking(payout),
-    nextAction: riskResult.decision === RISK_DECISION.APPROVED ? 'PROCESS' : 'NONE'
+    nextAction: approval.autoApproved ? 'PROCESS' : 'NONE'
   };
 }
 
@@ -412,6 +439,13 @@ async function previewPayout(input) {
     receiverCountryCode: input.receiverCountryCode,
     amountCents,
     currencyCode: currency
+  });
+  const approval = decidePayoutApprovalPath({
+    riskDecision: riskResult.decision,
+    riskFlags: riskResult.flags,
+    amountCents: pricing.totalDebitCents,
+    currencyCode: currency,
+    provider: 'paypal'
   });
   const availableBalanceCents = Number(user.wallet.availableBalanceCents || 0);
 
@@ -435,12 +469,9 @@ async function previewPayout(input) {
     },
     risk_decision: riskResult.decision,
     risk_flags: riskResult.flags,
-    next_action:
-      riskResult.decision === RISK_DECISION.APPROVED
-        ? 'PROCESS'
-        : riskResult.decision === RISK_DECISION.REVIEW
-          ? 'MANUAL_REVIEW'
-          : 'BLOCK'
+    approval_decision: approval.decision,
+    approval_reason: approval.reason,
+    next_action: approval.autoApproved ? 'PROCESS' : approval.decision === 'MANUAL_REVIEW' ? 'MANUAL_REVIEW' : 'BLOCK'
   };
 }
 

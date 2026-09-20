@@ -173,6 +173,11 @@ test('flags possible duplicate transaction references without auto-rejecting', a
 test('admin approval credits points exactly once and writes audit plus ledger records', async () => {
   await createUser('funding-user-approve');
   const request = await createSubmittedFundingRequest('funding-user-approve', 'APPROVE-TX-001');
+  await pointsFundingService.assignFundingRequest({
+    requestId: request.id,
+    adminActorId: 'finance-manager',
+    assignedTo: 'finance-admin'
+  });
 
   const approved = await pointsFundingService.approveFundingRequest({
     requestId: request.id,
@@ -225,6 +230,11 @@ test('admin approval credits points exactly once and writes audit plus ledger re
 test('concurrent admin approvals cannot double-credit a funding request', async () => {
   await createUser('funding-user-concurrent');
   const request = await createSubmittedFundingRequest('funding-user-concurrent', 'CONCURRENT-TX-001');
+  await pointsFundingService.assignFundingRequest({
+    requestId: request.id,
+    adminActorId: 'finance-manager',
+    assignedTo: 'finance-admin-a'
+  });
 
   const results = await Promise.all([
     pointsFundingService.approveFundingRequest({
@@ -253,6 +263,40 @@ test('concurrent admin approvals cannot double-credit a funding request', async 
 
   const ledgerEntries = await pointTransactionRepository.findByUserId('funding-user-concurrent');
   assert.equal(ledgerEntries.filter((entry) => entry.referenceId === request.id).length, 1);
+});
+
+test('funding approval requires an assigned reviewer and four-eyes separation', async () => {
+  await createUser('funding-user-maker-checker');
+  const request = await createSubmittedFundingRequest('funding-user-maker-checker', 'MAKER-CHECKER-001');
+
+  await assert.rejects(
+    pointsFundingService.approveFundingRequest({
+      requestId: request.id,
+      adminActorId: 'finance-admin',
+      idempotencyKey: 'maker-checker-unassigned'
+    }),
+    (error) => error?.code === 'FUNDING_REQUEST_REVIEWER_REQUIRED'
+  );
+
+  await pointsFundingService.assignFundingRequest({
+    requestId: request.id,
+    adminActorId: 'finance-admin',
+    assignedTo: 'finance-reviewer'
+  });
+  await assert.rejects(
+    pointsFundingService.approveFundingRequest({
+      requestId: request.id,
+      adminActorId: 'finance-admin',
+      idempotencyKey: 'maker-checker-self-approval'
+    }),
+    (error) => error?.code === 'FUNDING_REQUEST_FOUR_EYES_REQUIRED'
+  );
+  const approved = await pointsFundingService.approveFundingRequest({
+    requestId: request.id,
+    adminActorId: 'finance-reviewer',
+    idempotencyKey: 'maker-checker-valid-approval'
+  });
+  assert.equal(approved.funding_request.status, 'POINTS_CREDITED');
 });
 
 test('admin can reject or request more information without crediting points', async () => {

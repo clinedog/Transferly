@@ -274,7 +274,7 @@ test('telegram auth exchanges init data without global raw init-data headers or 
     expect(request.headers['x-telegram-start-param'], request.path).toBeUndefined();
   }
 
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_api_token'))).toBe('tg-session-token');
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('transferly_api_session'))).toBe('tg-session-token');
   const meRequest = api.requests.find((entry) => entry.path === '/api/me');
   expect(meRequest.headers.authorization).toBe('Bearer tg-session-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
@@ -291,7 +291,7 @@ test('telegram auth recovery retries temporary failures and deduplicates recover
   await page.getByRole('button', { name: 'Try Again' }).click();
 
   await expect.poll(() => api.requests.filter((entry) => entry.path === '/api/auth/telegram-mini-app').length).toBeGreaterThan(1);
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_api_token'))).toBe('tg-session-token');
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('transferly_api_session'))).toBe('tg-session-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
 });
 

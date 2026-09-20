@@ -179,17 +179,14 @@ Apply these at all times — not only during explicit security reviews:
 <!-- BUS:START -->
 ## 🔴 LIVE BOARD — read this before you touch anything
 
-_Generated 2026-09-16T00:00Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
+_Generated 2026-09-20T12:55Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
 
-**⚠️ 1 WARNING(S) — your next run may be affected:**
+**⚠️ 2 WARNING(S) — your next run may be affected:**
 - `emu37qfu6iap8` **copilot**: User operations now prompts for reason and confirmation before points adjustments and loads authoritative finance profiles; no general audit-log API exists, so no synthetic audit UI was added.
+- `emu3ej6oljlud` **copilot**: Failure-injection test exposed and fixed classification ordering bug: PROVIDER_TIMEOUT now maps to timeout instead of generic provider failure, preserving retry semantics.
 
-**📌 CLAIMED RIGHT NOW (5) — do NOT edit these paths:**
-- **copilot**: path:miniapp/src/context/AppContext.jsx, path:miniapp/src/components/MiniAppShell.jsx, path:miniapp/src/lib/api.js, path:miniapp/test/organizationSwitcherContract.test.js — expires 00:22Z — Implementing Mini App organization context/switcher backed by authenticated organization APIs with personal-workspace fallback and contract tests.
-- **copilot**: path:api/db/migrations/202609150007_api_key_organizations.js, path:api/repositories/apiKeyRepository.js, path:api/services/apiKeyService.js, path:api/controllers/apiKeyController.js, path:api/middleware/authenticateRequest.js, path:api/middleware/resolveOrganizationContext.js, path:api/test/apiKeyOrganization.test.js — expires 00:29Z — Binding API keys to organization context with migration, auth propagation, and regression tests.
-- **copilot**: path:miniapp/src/components/OrganizationTeamSection.jsx, path:miniapp/src/lib/api.js, path:miniapp/src/components/MiniAppFinanceSuite.jsx, path:miniapp/test/organizationTeamContract.test.js — expires 00:32Z — Implementing Mini App organization team and invitation management UI with contract tests.
-- **copilot**: path:api/db/migrations/202609150008_financial_organization_ownership.js, path:api/repositories/invoiceRepository.js, path:api/repositories/payoutRepository.js, path:api/services/invoiceService.js, path:api/services/payoutService.js, path:api/test/tenantFinancialIsolation.test.js — expires 00:35Z — Auditing and adding organization ownership compatibility for invoice/payout resources with authorization tests.
-- **copilot**: path:api/db/migrations/202609150009_wallet_ledger_organization_ownership.js, path:api/repositories/walletRepository.js, path:api/repositories/ledgerRepository.js, path:api/repositories/transactionRepository.js, path:api/test/tenantWalletLedgerIsolation.test.js — expires 00:38Z — Auditing and adding organization ownership compatibility for wallets and ledger/transaction reads.
+**📌 CLAIMED RIGHT NOW (1) — do NOT edit these paths:**
+- **Transferly**: miniapp/**, api/**, docs/mini.md, path:docs/codex — expires 14:55Z — Starting execution of all remaining phases in mini.md (Phases 15-28): design system, responsive UX, performance, observability, security, operations, testing, documentation. Will proceed incrementally with evidence-driven verification at each phase.
 
 Full board: use the `trc_team_read` tool, or run `agent-bus.mjs read --agent <you>`.
 <!-- BUS:END -->

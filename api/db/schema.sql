@@ -226,6 +226,10 @@ CREATE TABLE IF NOT EXISTS payouts (
   processed_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  on_hold INTEGER NOT NULL DEFAULT 0,
+  held_by_actor_id TEXT,
+  held_at TEXT,
+  hold_reason TEXT,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
   FOREIGN KEY (payout_batch_id) REFERENCES payout_batches(id) ON DELETE SET NULL
 );
@@ -1074,3 +1078,30 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_status
   ON auth_sessions (user_id, status, created_at);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_status_expires_at
   ON auth_sessions (status, expires_at);
+
+CREATE TABLE IF NOT EXISTS organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'suspended', 'archived')),
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS organization_memberships (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('OWNER', 'ADMINISTRATOR', 'FINANCE_MANAGER', 'OPERATIONS', 'ACCOUNTANT', 'VIEWER')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'removed')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (organization_id, user_id),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_memberships_user_status
+  ON organization_memberships(user_id, status);

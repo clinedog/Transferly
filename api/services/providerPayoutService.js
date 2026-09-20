@@ -20,6 +20,7 @@ const { riskService } = require('./riskService');
 const { payoutOutboxService } = require('./payoutOutboxService');
 const { providerOperationInboxService } = require('./providerOperationInboxService');
 const { RECOVERY_OUTCOME, providerOperationRecoveryService } = require('./providerOperationRecoveryService');
+const { decidePayoutApprovalPath } = require('./payoutPolicyService');
 
 const stripeClient = new StripeClient({
   secretKey: config.STRIPE_SECRET_KEY,
@@ -119,6 +120,13 @@ async function previewStripePayout(input) {
     amountCents,
     currencyCode: currency
   });
+  const approval = decidePayoutApprovalPath({
+    riskDecision: riskResult.decision,
+    riskFlags: riskResult.flags,
+    amountCents: pricing.totalDebitCents,
+    currencyCode: currency,
+    provider: 'stripe'
+  });
   const availableBalanceCents = Number(user.wallet.availableBalanceCents || 0);
   const providerBalance = input.includeProviderBalance
     ? await providerBalanceService.getProviderBalance({
@@ -129,12 +137,11 @@ async function previewStripePayout(input) {
       })
     : null;
   const providerAvailableCents = providerBalance ? sumAvailableCurrency(providerBalance, currency) : null;
-  const riskNextAction =
-    riskResult.decision === RISK_DECISION.APPROVED
-      ? 'READY_AFTER_SETUP'
-      : riskResult.decision === RISK_DECISION.REVIEW
-        ? 'MANUAL_REVIEW'
-        : 'BLOCK';
+  const riskNextAction = approval.autoApproved
+    ? 'READY_AFTER_SETUP'
+    : approval.decision === 'MANUAL_REVIEW'
+      ? 'MANUAL_REVIEW'
+      : 'BLOCK';
 
   return {
     provider: 'stripe',
@@ -171,6 +178,8 @@ async function previewStripePayout(input) {
       : null,
     risk_decision: riskResult.decision,
     risk_flags: riskResult.flags,
+    approval_decision: approval.decision,
+    approval_reason: approval.reason,
     next_action: config.STRIPE_PAYOUTS_ENABLED && riskNextAction === 'READY_AFTER_SETUP' ? 'PROCESS' : riskNextAction
   };
 }
@@ -239,13 +248,20 @@ async function requestStripePayout(input) {
     amountCents,
     currencyCode: currency
   });
+  const approval = decidePayoutApprovalPath({
+    riskDecision: riskResult.decision,
+    riskFlags: riskResult.flags,
+    amountCents: pricing.totalDebitCents,
+    currencyCode: currency,
+    provider: 'stripe'
+  });
 
   const payoutId = randomUUID();
   const senderBatchId = `stripe_payout_${payoutId}`;
   const initialStatus =
-    riskResult.decision === RISK_DECISION.APPROVED
+    approval.autoApproved
       ? PAYOUT_STATUS.QUEUED
-      : riskResult.decision === RISK_DECISION.REVIEW
+      : approval.decision === 'MANUAL_REVIEW'
         ? PAYOUT_STATUS.PENDING_APPROVAL
         : PAYOUT_STATUS.DENIED;
 
@@ -280,6 +296,11 @@ async function requestStripePayout(input) {
           total_debit_cents: pricing.totalDebitCents,
           fee_fixed_cents: pricing.feeFixedCents,
           fee_percentage_bps: pricing.feePercentageBps
+        },
+        approval: {
+          decision: approval.decision,
+          reason: approval.reason,
+          details: approval.details
         }
       }
     }, client);
@@ -320,8 +341,22 @@ async function requestStripePayout(input) {
       }, client);
     }
 
-    if (riskResult.decision === RISK_DECISION.APPROVED) {
+    if (approval.autoApproved) {
       await payoutOutboxService.recordPayoutProcessingRequested(created.id, client);
+      await auditLogService.log({
+        actorType: AUDIT_ACTOR_TYPE.SYSTEM,
+        actorId: null,
+        action: 'payout.auto_approved',
+        entityType: 'payout',
+        entityId: created.id,
+        metadata: {
+          approval_decision: approval.decision,
+          approval_reason: approval.reason,
+          approval_details: approval.details,
+          reserved_amount_cents: pricing.totalDebitCents,
+          processing_event: `payout:process:${created.id}`
+        }
+      }, client);
     }
 
     return created;
@@ -336,7 +371,7 @@ async function requestStripePayout(input) {
 
   return {
     ...payoutTracking(payout),
-    nextAction: riskResult.decision === RISK_DECISION.APPROVED ? 'PROCESS' : 'NONE'
+    nextAction: approval.autoApproved ? 'PROCESS' : 'NONE'
   };
 }
 

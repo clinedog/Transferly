@@ -8,6 +8,11 @@ coverage
 .idea
 .vscode
 *.log
+**/cookies.txt
+**/httrack_cookies.txt
+**/*cookies*.txt
+**/*session-export*
+**/*session*.json
 data/*.sqlite
 data/*.sqlite-*
 bot/db/*.db

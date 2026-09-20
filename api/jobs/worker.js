@@ -8,6 +8,7 @@ const {
   payoutRetryQueue,
   payoutProcessQueue,
   pointReservationExpiryQueue,
+  reconciliationQueue,
   queueNames,
   redisConnection
 } = require('./queues');
@@ -19,6 +20,7 @@ const {
   createExpirePointReservationJob,
   registerPointReservationExpirySchedule
 } = require('./expirePointReservationJob');
+const { registerPaymentReconciliationSchedule } = require('./paymentReconciliationJob');
 const {
   RETRY_DELAYS_MS,
   classifyWorkerFailure,
@@ -214,6 +216,11 @@ async function bootstrap() {
   await registerPointReservationExpirySchedule(pointReservationExpiryQueue, {
     intervalMs: config.POINT_RESERVATION_EXPIRY_INTERVAL_MS,
     batchSize: config.POINT_RESERVATION_EXPIRY_BATCH_SIZE
+  });
+  await registerPaymentReconciliationSchedule(reconciliationQueue, {
+    intervalMs: config.PAYMENT_RECONCILIATION_INTERVAL_MS,
+    invoiceLimit: config.PAYMENT_RECONCILIATION_INVOICE_LIMIT,
+    payoutLimit: config.PAYMENT_RECONCILIATION_PAYOUT_LIMIT
   });
 
   await Promise.all([

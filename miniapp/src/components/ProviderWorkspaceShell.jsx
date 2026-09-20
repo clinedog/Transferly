@@ -11,24 +11,35 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { getProviderWorkspaceRoute } from '../lib/providerManifests';
+import { normalizeProviderRuntimeStatus } from '../lib/providerWorkspaceContract';
 
 const statusTone = {
   live: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  ready: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  configured: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  authenticated: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
   'sandbox-ready': 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  'production-ready': 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  'webhook-ready': 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
   healthy: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
   connected: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
+  success: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
   preview: 'text-sky-100 border-sky-400/30 bg-sky-400/10',
   setup: 'text-sky-100 border-sky-400/30 bg-sky-400/10',
-  'needs-env': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
-  'needs-webhook': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
-  'needs-review': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
   pending: 'text-sky-100 border-sky-400/30 bg-sky-400/10',
   retrying: 'text-sky-100 border-sky-400/30 bg-sky-400/10',
+  'needs-env': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'needs_env': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'needs-webhook': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'needs_webhook': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'needs-review': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'needs_review': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
   degraded: 'text-amber-100 border-amber-400/30 bg-amber-400/10',
   'rate-limited': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  'not-configured': 'text-amber-100 border-amber-400/30 bg-amber-400/10',
+  not_configured: 'text-amber-100 border-amber-400/30 bg-amber-400/10',
   unsupported: 'text-[var(--tg-hint-color)] border-white/10 bg-white/5',
   unavailable: 'text-[var(--tg-hint-color)] border-white/10 bg-white/5',
-  success: 'text-emerald-200 border-emerald-400/30 bg-emerald-400/10',
   error: 'text-red-100 border-red-400/30 bg-red-400/10',
   disabled: 'text-[var(--tg-hint-color)] border-white/10 bg-white/5'
 };
@@ -89,7 +100,7 @@ const workspaceStateCopy = {
 };
 
 function normalizeStatus(status) {
-  return String(status || '').trim().toLowerCase();
+  return normalizeProviderRuntimeStatus(status);
 }
 
 function Badge({ children, tone = 'default' }) {

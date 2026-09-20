@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, ShieldCheck, Smartphone, User2, X } from 'lucide-react';
+import { AlertTriangle, Copy, ShieldCheck, Smartphone, User2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAppContext } from '../context/AppContext';
+import SecurityCenterSection from '../components/SecurityCenterSection';
 
 const tabs = [
   { key: 'profile', label: 'Profile', icon: User2 },
-  { key: 'session', label: 'Session', icon: Smartphone },
+  { key: 'session', label: 'Security', icon: Smartphone },
   { key: 'danger', label: 'Danger Zone', icon: AlertTriangle }
 ];
 
@@ -20,7 +21,7 @@ function initialsFromName(name, email) {
 }
 
 export default function ProfilePage() {
-  const { user, profile, receipts, updateProfile, deleteAccount, config, telegramAuthState } = useAppContext();
+  const { user, profile, receipts, updateProfile, deleteAccount, config } = useAppContext();
   const [activeTab, setActiveTab] = useState('profile');
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -217,34 +218,7 @@ export default function ProfilePage() {
             )}
 
             {activeTab === 'session' && (
-              <div className="rounded-[30px] border border-[#e9e0d2] bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.05)] md:p-7">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Telegram session</p>
-                <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">Access is controlled by the bot and API session.</h2>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Transferly uses Telegram Mini App init data to establish the API session, so there is no separate miniapp credential to manage here.
-                </p>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-[24px] bg-[#faf7f1] px-4 py-4 text-sm text-slate-600">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 size={18} className="mt-0.5 text-emerald-500" />
-                      <div>
-                        <p className="font-black text-slate-950">Session status</p>
-                        <p className="mt-1 capitalize">{telegramAuthState || 'unavailable'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] bg-[#faf7f1] px-4 py-4 text-sm text-slate-600">
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck size={18} className="mt-0.5" style={{ color: brand }} />
-                      <div>
-                        <p className="font-black text-slate-950">Identity source</p>
-                        <p className="mt-1">Telegram profile plus Transferly API wallet records.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <SecurityCenterSection />
             )}
 
             {activeTab === 'danger' && (

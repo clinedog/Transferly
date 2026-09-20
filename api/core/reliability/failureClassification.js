@@ -60,7 +60,7 @@ function classifyFailure(error = {}) {
   if (status === 403) return buildClassification({ className: FAILURE_CLASSES.AUTHORIZATION, retryable: false, status, code });
   if (status === 409) return buildClassification({ className: FAILURE_CLASSES.DUPLICATE, retryable: false, status, code });
   if (status === 429) return buildClassification({ className: FAILURE_CLASSES.RATE_LIMIT, retryable: true, status, code });
-  if (status === 408 || code === 'REQUEST_TIMEOUT' || code === 'ETIMEDOUT' || code === 'ECONNABORTED' || message.includes('timeout')) {
+  if (status === 408 || code === 'REQUEST_TIMEOUT' || code === 'PROVIDER_TIMEOUT' || code === 'ETIMEDOUT' || code === 'ECONNABORTED' || message.includes('timeout')) {
     return buildClassification({ className: FAILURE_CLASSES.TIMEOUT, retryable: true, status, code });
   }
   if (code?.startsWith('SQLITE_')) {

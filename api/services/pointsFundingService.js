@@ -684,6 +684,13 @@ async function approveFundingRequest({ requestId, adminActorId, adminNote, idemp
     if (![POINTS_FUNDING_STATUS.PAYMENT_REPORTED, POINTS_FUNDING_STATUS.UNDER_REVIEW].includes(request.status)) {
       throw new AppError(409, 'FUNDING_REQUEST_NOT_APPROVABLE', 'Funding request is not eligible for approval.');
     }
+    const isVerifiedPaymentApproval = adminActorId === 'payment-verification-engine';
+    if (!isVerifiedPaymentApproval && !request.assignedTo) {
+      throw new AppError(409, 'FUNDING_REQUEST_REVIEWER_REQUIRED', 'A funding request must be assigned before approval.');
+    }
+    if (!isVerifiedPaymentApproval && request.assignedBy === adminActorId) {
+      throw new AppError(409, 'FUNDING_REQUEST_FOUR_EYES_REQUIRED', 'The assigning actor cannot approve their own funding request.');
+    }
 
     const ledgerEntryKey = `points-funding:${request.id}:credit`;
     const ledgerResult = await pointLedgerService.applyEntry(

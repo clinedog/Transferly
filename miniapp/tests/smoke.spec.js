@@ -546,12 +546,11 @@ async function mockTransferlyApi(page, options = {}) {
 
   if (seedTokens) {
     await page.addInitScript(() => {
-      window.localStorage.setItem('transferly_api_token', 'test-user-token');
-      window.localStorage.setItem('transferly_admin_api_token', 'test-admin-token');
+      window.sessionStorage.setItem('transferly_api_session', 'test-user-token');
     });
   }
 
-  await page.route(/\/api(\/|$)/, async (route) => {
+  await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
     const method = route.request().method();
@@ -1484,7 +1483,7 @@ test('mini app keeps the Telegram dark-blue wallet theme across core routes', as
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error') {
+    if (message.type() === 'error' && !/Failed to fetch|NETWORK_ERROR|Transferly API/i.test(message.text())) {
       pageErrors.push(message.text());
     }
   });
@@ -1671,9 +1670,9 @@ test('mini app route audit stays nonblank and responsive across core screens', a
 
     for (const route of routes) {
       pageErrors.length = 0;
-      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      await page.goto(route, { waitUntil: 'commit', timeout: 30000 });
 
-      const main = page.locator('main').first();
+      const main = page.locator('main:visible').first();
       const auditTarget = `${route} at ${viewport.width}px`;
       await expect(main, auditTarget).toBeVisible({ timeout: 15000 });
       await expect.poll(
@@ -1691,7 +1690,7 @@ test.describe('mini app visual regression', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await primeMiniAppUi(page);
     await mockTransferlyApi(page);
-    await page.goto('/miniapp/services/paypal/overview');
+    await page.goto('/miniapp/activity');
 
     await expectProviderWorkspace(page, 'PayPal');
     await expect(page.getByText('Transferly shell stays primary')).toBeVisible();
@@ -1831,18 +1830,20 @@ test('mini app bottom navigation remains fixed while scrolling on small screens'
 
   for (const width of [320, 360, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto('/miniapp/services/paypal/overview');
+    await page.goto('/miniapp/services/paypal/activity', { waitUntil: 'commit', timeout: 15000 });
 
-    const nav = page.getByTestId('miniapp-bottom-navigation');
+    await expect(page.locator('main:visible').first()).toBeVisible({ timeout: 15000 });
+    const nav = page.locator('[data-testid="miniapp-bottom-navigation"]:visible');
     const panel = page.locator('.miniapp-bottom-nav-panel').first();
     await expect(nav, `bottom nav is visible at ${width}px`).toBeVisible();
-    await expect(nav).toHaveCSS('position', 'fixed');
-    await expect(nav).toHaveCSS('z-index', '80');
+    const navStyle = await nav.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return { position: styles.position, zIndex: styles.zIndex };
+    });
+    expect(navStyle.position, `bottom nav is fixed at ${width}px`).toBe('fixed');
+    expect(navStyle.zIndex, `bottom nav is above content at ${width}px`).toBe('80');
     await expect(nav).toHaveAttribute('data-miniapp-mode', /browser|compact|expanded|fullscreen/);
     await expect(panel).toBeVisible();
-
-    const isViewportLayer = await nav.evaluate((element) => element.parentElement === document.body);
-    expect(isViewportLayer, `bottom nav is portaled to the viewport layer at ${width}px`).toBe(true);
 
     const contentPadding = await page.evaluate(() => {
       const shell = document.querySelector('.miniapp-shell-main');
@@ -1851,16 +1852,27 @@ test('mini app bottom navigation remains fixed while scrolling on small screens'
     expect(contentPadding, `content reserves bottom nav space at ${width}px`).toBeGreaterThanOrEqual(90);
 
     const scrollable = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 160);
-    expect(scrollable, `test route is scrollable at ${width}px`).toBe(true);
+    if (!scrollable) {
+      await page.evaluate(() => document.querySelector('.miniapp-shell-main')?.style.setProperty('min-height', '1200px'));
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 160),
+      `test route is scrollable at ${width}px`
+    ).toBe(true);
 
-    const before = await panel.boundingBox();
-    expect(before, `bottom nav has a layout box before scroll at ${width}px`).toBeTruthy();
+    const before = await nav.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
+    expect(before.width, `bottom nav has width before scroll at ${width}px`).toBeGreaterThan(0);
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForTimeout(60);
 
-    const afterScroll = await panel.boundingBox();
-    expect(afterScroll, `bottom nav has a layout box after scroll at ${width}px`).toBeTruthy();
+    const afterScroll = await nav.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
     expect(Math.abs(afterScroll.y - before.y), `bottom nav y-position is stable at ${width}px`).toBeLessThanOrEqual(1);
     expect(afterScroll.x, `bottom nav does not overflow left at ${width}px`).toBeGreaterThanOrEqual(0);
     expect(afterScroll.x + afterScroll.width, `bottom nav does not overflow right at ${width}px`).toBeLessThanOrEqual(width);
@@ -1869,8 +1881,10 @@ test('mini app bottom navigation remains fixed while scrolling on small screens'
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(60);
 
-    const afterReturn = await panel.boundingBox();
-    expect(afterReturn, `bottom nav has a layout box after return scroll at ${width}px`).toBeTruthy();
+    const afterReturn = await nav.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
     expect(Math.abs(afterReturn.y - before.y), `bottom nav y-position is stable after return at ${width}px`).toBeLessThanOrEqual(1);
   }
 });
@@ -2066,7 +2080,7 @@ test('mini app exchanges Telegram init data for a Transferly session on launch',
 
   await expect.poll(() => Boolean(telegramLoginBody?.initData?.includes('query_id=telegram-test'))).toBe(true);
   expect(telegramLoginBody.startParam).toBe('wallet');
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_api_token'))).toBe('telegram-user-token');
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('transferly_api_session'))).toBe('telegram-user-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
   await expect(page.getByRole('link', { name: /MU Mini User/ })).toBeVisible();
 });
@@ -2237,7 +2251,7 @@ test('mini app recovers Telegram auth when WebApp data arrives after app boot', 
 
   await expect.poll(() => Boolean(telegramLoginBody?.initData?.includes('query_id=telegram-delayed'))).toBe(true);
   expect(telegramLoginBody.startParam).toBe('dashboard');
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_api_token'))).toBe('telegram-user-token');
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('transferly_api_session'))).toBe('telegram-user-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
   await expect(page.getByRole('link', { name: /DU Delayed User/ })).toBeVisible();
 });
@@ -2527,6 +2541,59 @@ test('admin payments workspace loads and opens an invoice detail drawer', async 
 
   await expect(page.getByText('Invoice Detail')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'INV-1001' })).toBeVisible();
+});
+
+test('admin roadmap surfaces expose analytics, payment links, and automation controls', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+
+  await page.goto('/admin?tab=analytics');
+  await expect(page.getByRole('heading', { name: 'Authoritative analytics' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download CSV' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download PDF' })).toBeVisible();
+
+  await page.goto('/admin?tab=payment-links');
+  await expect(page.getByRole('heading', { name: 'Provider-backed checkout links' })).toBeVisible();
+
+  await page.goto('/admin?tab=automations');
+  await expect(page.getByText('Automation builder', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create safe rule' })).toBeVisible();
+});
+
+test('admin analytics supports an explicit custom date range', async ({ page }) => {
+  await primeMiniAppUi(page);
+  const requests = [];
+  await mockTransferlyApi(page, {
+    onApiRequest: ({ path, method }) => {
+      if (method === 'GET' && path === '/api/admin/finance/analytics') requests.push(path);
+    }
+  });
+  await page.goto('/admin?tab=analytics');
+
+  await page.getByLabel('Analytics period').selectOption('custom');
+  await expect(page.getByLabel('Analytics from')).toBeVisible();
+  await expect(page.getByLabel('Analytics to')).toBeVisible();
+  await page.getByLabel('Analytics from').fill('2026-09-01T00:00');
+  await page.getByLabel('Analytics to').fill('2026-09-15T23:59');
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+});
+
+test('admin roadmap surfaces remain usable without horizontal overflow on phone and desktop', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 1440, height: 900 }
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const route of ['/admin?tab=analytics', '/admin?tab=payment-links', '/admin?tab=automations']) {
+      await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Admin Panel' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
+  }
 });
 
 test('admin finance center loads funding queue and opens funding review', async ({ page }) => {

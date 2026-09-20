@@ -1,6 +1,7 @@
 const { providerModuleRegistry } = require('../providers/moduleRegistry');
 const { selectBestProvider, filterByCapability, validateCapabilities } = require('../core/financial/providerRegistry');
 const { normalizeExecutionStatus } = require('../core/financial/providerContract');
+const { executeProviderOperation } = require('../core/financial/providerExecution');
 
 function listProviders() {
   return providerModuleRegistry.list().map((provider) => provider.adapter.getSummary());
@@ -28,6 +29,13 @@ function listProviderAdapterContracts() {
 
 function getProviderAdapterContract(providerKey) {
   return getProvider(providerKey).getAdapterContract();
+}
+
+async function executeOperation({ provider, operation, input, environment, mutating } = {}) {
+  return executeProviderOperation(getProvider(provider), operation, input, {
+    environment,
+    mutating
+  });
 }
 
 /**
@@ -135,6 +143,7 @@ module.exports = {
     getProviderInvoiceFeatures,
     listProviderAdapterContracts,
     getProviderAdapterContract,
+    executeOperation,
     selectProvider,
     listProvidersWithCapability,
     validateProviderCapabilities

@@ -14,7 +14,7 @@ function requireAtLeastOneField(schema, message) {
 
 const releaseInvoiceFundsSchema = z.object({
   amount: z.coerce.number().positive().optional(),
-  reason: z.string().max(1000).optional()
+  reason: z.string().trim().min(3).max(1000)
 });
 
 const adminUserIdParamsSchema = z.object({
@@ -69,6 +69,19 @@ const adminFinanceTransactionsQuerySchema = z.object({
   reference: z.string().trim().min(1).max(160).optional(),
   direction: z.enum(['CREDIT', 'DEBIT']).optional(),
   limit: z.coerce.number().int().positive().max(250).default(100)
+});
+
+const adminAnalyticsQuerySchema = z.object({
+  period: z.enum(['today', '7d', '30d', '90d', 'custom']).default('30d'),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+}).superRefine((value, context) => {
+  if (value.period === 'custom' && (!value.from || !value.to)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['from'], message: 'Custom analytics requires from and to.' });
+  }
+  if (value.from && value.to && new Date(value.from) >= new Date(value.to)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['to'], message: 'Analytics to must be after from.' });
+  }
 });
 
 const adminAuditLogsQuerySchema = z.object({
@@ -242,7 +255,7 @@ const paymentOpsIssueActionSchema = z.object({
 });
 
 const providerIncidentTransitionSchema = z.object({
-  status: z.enum(['INVESTIGATING', 'MITIGATED', 'RESOLVED', 'CLOSED'])
+  status: z.enum(['ACKNOWLEDGED', 'INVESTIGATING', 'MITIGATED', 'RESOLVED', 'CLOSED'])
 }).strict();
 
 const providerIncidentParamsSchema = z.object({
@@ -252,14 +265,28 @@ const providerIncidentParamsSchema = z.object({
 const automationRuleCreateSchema = z.object({
   name: z.string().trim().min(1).max(100),
   trigger: z.enum(['PAYMENT_SUCCEEDED', 'PAYMENT_FAILED', 'INVOICE_PAID', 'INVOICE_OVERDUE', 'PAYOUT_SUCCEEDED', 'PAYOUT_FAILED', 'TRANSACTION_UNKNOWN', 'PROVIDER_HEALTH_CHANGED']),
-  condition: z.object({ amount: z.number().nonnegative().optional() }).strict().default({}),
+  condition: z.object({
+    amount: z.number().nonnegative().optional(),
+    currency: z.string().trim().max(12).optional(),
+    provider: z.string().trim().max(50).optional(),
+    customer: z.string().trim().max(120).optional(),
+    status: z.string().trim().max(50).optional(),
+    country: z.string().trim().max(3).optional(),
+    risk: z.string().trim().max(30).optional()
+  }).strict().default({}),
   action: z.enum(['NOTIFY_ADMIN', 'NOTIFY_USER', 'CREATE_RECONCILIATION_TASK', 'SEND_RECEIPT'])
 }).strict();
 
 const automationRuleStatusSchema = z.object({ status: z.enum(['ACTIVE', 'PAUSED']) }).strict();
 const automationRuleDryRunSchema = z.object({
   trigger: z.string().trim().min(1),
-  amount: z.number().nonnegative().optional()
+  amount: z.number().nonnegative().optional(),
+  currency: z.string().trim().max(12).optional(),
+  provider: z.string().trim().max(50).optional(),
+  customer: z.string().trim().max(120).optional(),
+  status: z.string().trim().max(50).optional(),
+  country: z.string().trim().max(3).optional(),
+  risk: z.string().trim().max(30).optional()
 }).strict();
 
 const faqContentSchema = z.object({
@@ -472,6 +499,7 @@ module.exports = {
   adminFinanceAlertsQuerySchema,
   adminAuditLogsQuerySchema,
   adminFinanceTransactionsQuerySchema,
+  adminAnalyticsQuerySchema,
   adminPaymentTransactionsQuerySchema,
   listInvoiceReminderConfigurationsQuerySchema,
   listAdminFundingRequestsQuerySchema,

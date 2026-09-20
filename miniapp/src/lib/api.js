@@ -3,15 +3,15 @@ const API_BASE_URL = RAW_API_BASE_URL.replace(/\/$/, '');
 const API_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_REQUEST_TIMEOUT_MS || 15000);
 const API_SAFE_RETRY_ATTEMPTS = Number(import.meta.env.VITE_API_SAFE_RETRY_ATTEMPTS || 2);
 const API_DEBUG = import.meta.env.VITE_API_DEBUG === 'true' || import.meta.env.DEV;
-const TOKEN_STORAGE_KEY = 'transferly_api_token';
-const ADMIN_TOKEN_STORAGE_KEY = 'transferly_admin_api_token';
-const LEGACY_TOKEN_STORAGE_KEY = 'slipcraft_api_token';
-const BOOTSTRAP_CACHE_KEY = 'transferly_bootstrap_cache_v1';
+const SESSION_TOKEN_STORAGE_KEY = 'transferly_api_session';
+const LEGACY_SESSION_TOKEN_STORAGE_KEY = 'slipcraft_api_session';
 const ORGANIZATION_PREFERENCE_KEY = 'transferly.selected-organization-id';
 const SAFE_RETRY_METHODS = new Set(['GET', 'HEAD']);
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 let lastApiFailure = null;
 let lastApiSuccess = null;
+let sessionToken = null;
+let adminSessionToken = null;
 
 function isLocalPreviewHost() {
   if (typeof window === 'undefined') {
@@ -180,38 +180,19 @@ export function getApiDiagnostics() {
 }
 
 export function getStoredToken() {
+  if (sessionToken) return sessionToken;
   try {
-    const currentToken = window.localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (currentToken) {
-      return currentToken;
-    }
-
-    const legacyToken = window.localStorage.getItem(LEGACY_TOKEN_STORAGE_KEY);
-    if (legacyToken) {
-      try {
-        window.localStorage.setItem(TOKEN_STORAGE_KEY, legacyToken);
-      } catch (storageError) {
-        // Storage is full or unavailable - still return token for this session
-        console.warn('[API] Could not migrate legacy token to new storage', storageError);
-      }
-      return legacyToken;
-    }
-
-    return null;
+    return window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY)
+      || window.sessionStorage.getItem(LEGACY_SESSION_TOKEN_STORAGE_KEY)
+      || null;
   } catch (error) {
-    // localStorage unavailable (private mode, permissions, etc.)
-    console.warn('[API] localStorage.getItem failed', error);
+    console.warn('[API] session storage unavailable', error);
     return null;
   }
 }
 
 export function getStoredAdminToken() {
-  try {
-    return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || null;
-  } catch (error) {
-    console.warn('[API] localStorage.getItem failed for admin token', error);
-    return null;
-  }
+  return adminSessionToken;
 }
 
 export function setStoredToken(token) {
@@ -220,66 +201,32 @@ export function setStoredToken(token) {
     return;
   }
 
+  sessionToken = token;
   try {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    window.sessionStorage.removeItem(LEGACY_SESSION_TOKEN_STORAGE_KEY);
   } catch (error) {
-    // Storage is full or unavailable
-    if (error.name === 'QuotaExceededError') {
-      console.warn('[API] localStorage quota exceeded, clearing old cache', error);
-      try {
-        // Try to clear old cache entries to make room
-        window.localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
-        window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      } catch (retryError) {
-        console.error('[API] Could not store token even after clearing cache', retryError);
-      }
-    } else if (error.name === 'SecurityError') {
-      // Private/incognito mode - session-only is acceptable
-      console.warn('[API] localStorage unavailable (private mode), using session-only mode', error);
-    } else {
-      console.error('[API] Unexpected storage error', error);
-    }
+    console.warn('[API] session storage unavailable; keeping token in memory only', error);
   }
 }
 
 export function setStoredAdminToken(token) {
   if (!token) {
-    try {
-      window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-    } catch (error) {
-      console.warn('[API] localStorage.removeItem failed', error);
-    }
+    adminSessionToken = null;
     return;
   }
 
-  try {
-    window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
-  } catch (error) {
-    if (error.name === 'QuotaExceededError') {
-      console.warn('[API] localStorage quota exceeded', error);
-    } else if (error.name === 'SecurityError') {
-      console.warn('[API] localStorage unavailable (private mode)', error);
-    } else {
-      console.error('[API] Unexpected storage error', error);
-    }
-  }
+  adminSessionToken = token;
 }
 
 export function clearStoredToken() {
+  sessionToken = null;
+  adminSessionToken = null;
   try {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(LEGACY_SESSION_TOKEN_STORAGE_KEY);
   } catch (error) {
-    console.warn('[API] Could not remove token', error);
-  }
-  try {
-    window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-  } catch (error) {
-    console.warn('[API] Could not remove admin token', error);
-  }
-  try {
-    window.localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
-  } catch (error) {
-    console.warn('[API] Could not remove legacy token', error);
+    console.warn('[API] Could not clear session token storage', error);
   }
 }
 
@@ -342,7 +289,7 @@ function createRequestSignal(parentSignal) {
 export async function apiRequest(path, options = {}) {
   const { retries, signal: parentSignal, ...fetchOptions } = options;
   const headers = new Headers(options.headers || {});
-  headers.set('Accept', 'application/json');
+  headers.set('Accept', options.responseType === 'blob' ? 'text/csv,application/json' : 'application/json');
   headers.set('X-Transferly-Client', 'telegram-miniapp');
   const selectedOrganizationId = getSelectedOrganizationId();
   if (selectedOrganizationId && !headers.has('X-Organization-Id')) {
@@ -436,7 +383,9 @@ export async function apiRequest(path, options = {}) {
     await sleep(getRetryDelay(attempt, response));
   }
 
-  const payload = await parseJsonSafely(response);
+  const payload = response.ok && options.responseType === 'blob'
+    ? await response.blob()
+    : await parseJsonSafely(response);
   const responseRequestId = response.headers.get('x-request-id') || payload?.requestId || requestId;
 
   if (!response.ok) {
@@ -479,6 +428,20 @@ export async function apiRequest(path, options = {}) {
   });
 
   return payload;
+}
+
+export function downloadAdminFinanceAnalyticsCsv(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return apiRequest(`/api/admin/finance/analytics.csv${query ? `?${query}` : ''}`, {
+    responseType: 'blob'
+  });
+}
+
+export function downloadAdminFinanceAnalyticsPdf(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return apiRequest(`/api/admin/finance/analytics.pdf${query ? `?${query}` : ''}`, {
+    responseType: 'blob'
+  });
 }
 
 export function getApiHealth(options = {}) {
@@ -777,6 +740,22 @@ export function listAdminAutomationHistory(params = {}) {
   return apiRequest(`/api/admin/automation-history${buildQuery(params)}`);
 }
 
+export function listAdminAutomationRules() {
+  return apiRequest('/api/admin/automation-rules');
+}
+
+export function createAdminAutomationRule(body) {
+  return apiRequest('/api/admin/automation-rules', { method: 'POST', body });
+}
+
+export function updateAdminAutomationRuleStatus(id, status) {
+  return apiRequest(`/api/admin/automation-rules/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } });
+}
+
+export function dryRunAdminAutomationRule(id, event) {
+  return apiRequest(`/api/admin/automation-rules/${encodeURIComponent(id)}/dry-run`, { method: 'POST', body: event });
+}
+
 export function getAdminSecurityOverview() {
   return apiRequest('/api/admin/security-overview');
 }
@@ -1026,6 +1005,16 @@ export function adjustUserPoints(userId, delta, reason) {
 
 export function getAdminFinanceOverview() {
   return apiRequest('/api/admin/finance/overview');
+}
+
+export function getAdminFinanceAnalytics(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return apiRequest(`/api/admin/finance/analytics${query ? `?${query}` : ''}`);
+}
+
+export function listPaymentLinks(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return apiRequest(`/api/invoices/payment-links${query ? `?${query}` : ''}`);
 }
 
 export function listAdminAuditLogs(params = {}) {

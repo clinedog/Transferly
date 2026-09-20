@@ -39,6 +39,7 @@ const { paymentProviderRegistry } = require('./paymentProviderRegistry');
 const { providerStatusService } = require('./providerStatusService');
 const providerCapabilityModule = require('./providerCapabilityService');
 const { providerCapabilityService } = providerCapabilityModule;
+const { providerKillSwitchService } = require('./providerKillSwitchService');
 const { AppError } = require('../utils/errors');
 const {
   TRANSACTION_TYPE,
@@ -434,6 +435,15 @@ async function routeProviders(input = {}) {
     const provider = normalizeProviderKey(moduleEntry.key);
     if (excluded.has(provider)) {
       skipped.push({ provider, stage: 'user_exclusion', reason: 'Explicitly excluded from routing.' });
+      continue;
+    }
+    const killSwitchReason = providerKillSwitchService.getBlockedReason({
+      provider,
+      country,
+      currency
+    });
+    if (killSwitchReason) {
+      skipped.push({ provider, stage: 'kill_switch', reason: killSwitchReason });
       continue;
     }
 

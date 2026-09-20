@@ -41,3 +41,25 @@ test('provider incidents reject invalid lifecycle transitions', async () => {
     (error) => error.code === 'PROVIDER_INCIDENT_INVALID_TRANSITION'
   );
 });
+
+test('provider incidents support explicit acknowledgement before investigation', async () => {
+  const transitions = [];
+  const updated = await providerIncidentService.transitionIncident({
+    incidentId: 'incident-ack',
+    status: 'ACKNOWLEDGED',
+    adminActorId: 'admin-1',
+    repository: {
+      async findById() {
+        return { id: 'incident-ack', provider: 'paypal', status: 'DETECTED' };
+      },
+      async transition(id, status) {
+        transitions.push([id, status]);
+        return { id, provider: 'paypal', status };
+      }
+    },
+    audit: { async log() {} }
+  });
+
+  assert.deepEqual(updated, { id: 'incident-ack', provider: 'paypal', status: 'ACKNOWLEDGED' });
+  assert.deepEqual(transitions, [['incident-ack', 'ACKNOWLEDGED']]);
+});

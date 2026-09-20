@@ -124,6 +124,14 @@ async function ensurePointReservationColumns(client) {
   await ensureColumn(client, 'point_reservations', 'expired_at', 'TEXT');
 }
 
+async function ensurePayoutManualHoldColumns(client) {
+  await ensureColumn(client, 'payouts', 'on_hold', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn(client, 'payouts', 'held_by_actor_id', 'TEXT');
+  await ensureColumn(client, 'payouts', 'held_at', 'TEXT');
+  await ensureColumn(client, 'payouts', 'hold_reason', 'TEXT');
+  await client.exec(`CREATE INDEX IF NOT EXISTS idx_payouts_on_hold ON payouts(on_hold) WHERE on_hold = 1;`);
+}
+
 async function ensureServiceCatalogueColumns(client) {
   await ensureColumn(client, 'services', 'description', 'TEXT');
   await ensureColumn(client, 'services', 'point_price', 'INTEGER NOT NULL DEFAULT 0');
@@ -172,6 +180,7 @@ async function migrate() {
     await ensureTelegramAccountColumns(client);
     await ensurePointTransactionColumns(client);
     await ensurePointReservationColumns(client);
+    await ensurePayoutManualHoldColumns(client);
     await ensureServiceCatalogueColumns(client);
 
     const migrationResult = await runPendingMigrations({ client });

@@ -4,7 +4,9 @@ const { providerInvoiceService } = require('./providerInvoiceService');
 const { paypalPayoutService } = require('./paypalPayoutService');
 const { providerPayoutService } = require('./providerPayoutService');
 const { RECOVERY_OUTCOME, providerOperationRecoveryService } = require('./providerOperationRecoveryService');
+const { reconciliationTimelineService } = require('./reconciliationTimelineService');
 const { AUDIT_ACTOR_TYPE, INVOICE_STATUS, PAYOUT_STATUS } = require('../utils/constants');
+const { auditLogService } = require('./auditLogService');
 
 const RECONCILABLE_INVOICE_STATUSES = new Set([
   INVOICE_STATUS.SENT,
@@ -76,6 +78,8 @@ async function reconcilePayouts(limit, excludedPayoutIds = new Set(), dependenci
 async function runPaymentReconciliation(options = {}, dependencies = {}) {
   const invoiceLimit = options.invoiceLimit || 25;
   const payoutLimit = options.payoutLimit || 25;
+  const timeline = dependencies.timeline || reconciliationTimelineService;
+  const audit = dependencies.audit || auditLogService;
 
   const recoveryService = dependencies.recovery || providerOperationRecoveryService;
   const providerOperations = await recoveryService.recoverPending({ limit: payoutLimit });
@@ -89,17 +93,49 @@ async function runPaymentReconciliation(options = {}, dependencies = {}) {
     reconcileInvoices(invoiceLimit, dependencies),
     reconcilePayouts(payoutLimit, blockedPayoutIds, dependencies)
   ]);
+  const mismatchReport = await timeline.detectMismatches({
+    invoiceLimit,
+    payoutLimit,
+    webhookLimit: options.webhookLimit || 100,
+    pointsLimit: options.pointsLimit || 200
+  });
+  const summary = {
+    invoice_count: invoices.length,
+    payout_count: payouts.length,
+    provider_operation_count: providerOperations.length,
+    mismatch_count: mismatchReport.mismatch_count,
+    alert_count: mismatchReport.points_alert_count || 0
+  };
+  const summaryHash = createHash('sha256').update(JSON.stringify(summary)).digest('hex');
+  const runId = randomUUID();
+  const summarySignature = createHmac('sha256', config.FINANCE_RECONCILIATION_SIGNING_SECRET)
+    .update(`${runId}.${summaryHash}`)
+    .digest('hex');
+  await audit.log({
+    actorType: AUDIT_ACTOR_TYPE.SYSTEM,
+    actorId: null,
+    action: 'payment_reconciliation.completed',
+    entityType: 'reconciliation_run',
+    entityId: runId,
+    metadata: {
+      ...summary,
+      summary_hash: summaryHash,
+      summary_signature: summarySignature,
+      checked_at: mismatchReport.checked_at
+    }
+  });
 
   return {
     reconciled_at: new Date().toISOString(),
     invoices,
     payouts,
     provider_operations: providerOperations,
-    summary: {
-      invoice_count: invoices.length,
-      payout_count: payouts.length,
-      provider_operation_count: providerOperations.length
-    }
+    reconciliation: {
+      mismatch_count: mismatchReport.mismatch_count,
+      alert_count: mismatchReport.points_alert_count || 0,
+      checked_at: mismatchReport.checked_at
+    },
+    summary: { ...summary, run_id: runId, summary_hash: summaryHash, summary_signature: summarySignature }
   };
 }
 
@@ -111,3 +147,7 @@ module.exports = {
   RECONCILABLE_PAYOUT_STATUSES,
   UNRESOLVED_RECOVERY_OUTCOMES
 };
+'use strict';
+
+const { createHash, createHmac, randomUUID } = require('node:crypto');
+const config = require('../config');

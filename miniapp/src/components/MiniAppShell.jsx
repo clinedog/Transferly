@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Copy,
+  FileClock,
   HelpCircle,
   Home,
   Maximize2,
@@ -43,9 +44,9 @@ const railItems = [
 const bottomItems = [
   { label: 'Home', to: '/miniapp', icon: Home },
   { label: 'Services', to: '/miniapp/services', icon: Sparkles },
-  { label: 'Activity', to: '/miniapp/activity', icon: Activity },
+  { label: 'Orders', to: '/miniapp/orders', icon: FileClock },
   { label: 'Wallet', to: '/miniapp/wallet', icon: WalletCards },
-  { label: 'More', to: '/miniapp/profile', icon: Users }
+  { label: 'Account', to: '/miniapp/profile', icon: Users }
 ];
 
 const COMMUNITY_MODAL_KEY = 'transferly_telegram_modal_dismissed';

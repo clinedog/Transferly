@@ -18,6 +18,19 @@ function subscriptionExpiryFromDays(days, base = Date.now()) {
 }
 
 function initializeUsersTable() {
+  // Queue the baseline table creation before the asynchronous compatibility
+  // inspection so early callers cannot observe a missing users table.
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    telegram_id INTEGER PRIMARY KEY,
+    username TEXT,
+    role TEXT CHECK(role IN ('OWNER','ADMIN','USER')) NOT NULL DEFAULT 'USER',
+    status TEXT CHECK(status IN ('ACTIVE','SUSPENDED','REVOKED')) NOT NULL DEFAULT 'ACTIVE',
+    subscription_expires_at DATETIME,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME,
+    created_by TEXT
+  )`);
   db.get(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`, [], (error, row) => {
     const currentSql = row?.sql || '';
     const needsRebuild = Boolean(

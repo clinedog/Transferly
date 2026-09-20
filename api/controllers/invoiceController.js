@@ -102,6 +102,48 @@ async function listInvoicesController(request, response) {
   });
 }
 
+async function listPaymentLinksController(request, response) {
+  const query = listInvoicesQuerySchema.parse(request.query || {});
+  const userId = request.auth && request.auth.role === 'USER' ? request.auth.userId : undefined;
+  const pageSize = query.pageSize || query.limit || 50;
+  const filters = {
+    ...query,
+    pageSize,
+    offset: (query.page - 1) * pageSize,
+    ...(userId ? { userId } : {}),
+    organizationId: request.auth.organizationId
+  };
+  const [invoices, total] = await Promise.all([
+    invoiceRepository.findMany(filters),
+    invoiceRepository.countMany(filters)
+  ]);
+  const links = invoices
+    .filter((invoice) => invoice.invoiceUrl)
+    .map((invoice) => ({
+      id: invoice.id,
+      invoice_number: invoice.invoiceNumber,
+      url: invoice.invoiceUrl,
+      amount_cents: invoice.amountCents,
+      currency: invoice.currencyCode,
+      description: invoice.description,
+      status: invoice.status,
+      provider: invoice.metadata?.provider || 'paypal',
+      created_at: invoice.createdAt,
+      due_date: invoice.dueDate,
+      paid_at: invoice.paidAt,
+      cancelled_at: invoice.cancelledAt
+    }));
+  response.json({
+    data: links,
+    pagination: {
+      page: query.page,
+      page_size: pageSize,
+      total,
+      has_next_page: query.page * pageSize < total
+    }
+  });
+}
+
 async function refreshInvoiceController(request, response) {
   const invoice = await loadAccessibleInvoice(request, response, request.params.id);
   if (!invoice) {
@@ -191,6 +233,7 @@ module.exports = {
   previewInvoiceController,
   getInvoiceController,
   listInvoicesController,
+  listPaymentLinksController,
   refreshInvoiceController,
   sendInvoiceReminderController,
   cancelInvoiceAutoRemindersController,

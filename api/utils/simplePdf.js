@@ -245,5 +245,6 @@ function buildReceiptArtifacts(title, summary, fields, metadata = {}) {
 }
 
 module.exports = {
-  buildReceiptArtifacts
+  buildReceiptArtifacts,
+  buildSimplePdf
 };

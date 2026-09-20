@@ -70,7 +70,10 @@ const statusTone = {
   HOLD: 'danger',
   UNKNOWN: 'unknown',
   RECONCILING: 'unknown',
-  RECONCILIATION: 'unknown'
+  RECONCILIATION: 'unknown',
+  RECONCILIATION_REQUIRED: 'unknown',
+  REQUIRES_ACTION: 'warn',
+  REQUIRES_USER_ACTION: 'warn'
 };
 
 function formatMoney(value, currency = 'USD') {
@@ -107,6 +110,24 @@ function formatDate(value) {
 
 function normalizeStatus(value) {
   return String(value || 'pending').replace(/_/g, ' ').toLowerCase();
+}
+
+function readableStatusLabel(status) {
+  const upper = String(status || 'PENDING').toUpperCase();
+
+  switch (upper) {
+    case 'UNKNOWN':
+    case 'RECONCILING':
+      return 'Reconciling';
+    case 'RECONCILIATION':
+    case 'RECONCILIATION_REQUIRED':
+      return 'Reconciliation required';
+    case 'REQUIRES_ACTION':
+    case 'REQUIRES_USER_ACTION':
+      return 'Action required';
+    default:
+      return normalizeStatus(upper);
+  }
 }
 
 function parseMoneyNumber(value) {
@@ -239,7 +260,7 @@ function StatusBadge({ status }) {
 
   return (
     <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${toneClass(tone)}`}>
-      {upper === 'UNKNOWN' || upper === 'RECONCILING' ? 'Reconciling' : normalizeStatus(upper)}
+      {readableStatusLabel(upper)}
     </span>
   );
 }
@@ -385,7 +406,7 @@ function Timeline({ events }) {
                     ) : null}
                     {event.status ? (
                       <span className="rounded-full bg-[var(--tg-section-bg-color)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--tg-hint-color)]">
-                        {event.status === 'UNKNOWN' || event.status === 'RECONCILING' ? 'Reconciling' : normalizeStatus(event.status)}
+                        {readableStatusLabel(event.status)}
                       </span>
                     ) : null}
                     {event.currency && event.amount !== null && event.amount !== undefined ? (
@@ -1887,9 +1908,9 @@ export function ActivitySection() {
                   ['Operation', selectedEvent.operation],
                   ['Amount', selectedEvent.amount !== null && selectedEvent.amount !== undefined ? formatMoney(selectedEvent.amount, selectedEvent.currency || 'USD') : 'Unavailable'],
                   ['Currency', selectedEvent.currency || 'Unavailable'],
-                  ['Status', selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING' ? 'Reconciling' : normalizeStatus(selectedEvent.status)],
+                  ['Status', readableStatusLabel(selectedEvent.status)],
                   ['Updated time', selectedEvent.time],
-                  ['Reconciliation', selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING' ? 'Reconciliation required' : 'No unresolved reconciliation signal']
+                  ['Reconciliation', ['UNKNOWN', 'RECONCILING', 'RECONCILIATION', 'RECONCILIATION_REQUIRED'].includes(String(selectedEvent.status || '').toUpperCase()) ? 'Reconciliation required' : 'No unresolved reconciliation signal']
                 ].map(([label, value]) => (
                   <SurfaceCard as="div" key={label} className="rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
                     <p className="text-xs font-bold text-[var(--tg-hint-color)]">{label}</p>
@@ -1901,7 +1922,7 @@ export function ActivitySection() {
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Timeline</p>
                 <Timeline events={[selectedEvent]} />
               </SurfaceCard>
-              {(selectedEvent.status === 'UNKNOWN' || selectedEvent.status === 'RECONCILING') ? (
+              {['UNKNOWN', 'RECONCILING', 'RECONCILIATION', 'RECONCILIATION_REQUIRED'].includes(String(selectedEvent.status || '').toUpperCase()) ? (
                 <p className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
                   Transaction outcome is being verified. Do not submit a duplicate retry until reconciliation is complete.
                 </p>

@@ -11,6 +11,8 @@ const AdminContentTab = lazy(() => import('../components/AdminTabs/AdminContentT
 const AdminPaymentsTab = lazy(() => import('../components/AdminTabs/PaymentsTab'));
 const AdminUsersTab = lazy(() => import('../components/AdminTabs/AdminUsersTab'));
 const AdminFinanceTab = lazy(() => import('../components/AdminTabs/AdminFinanceTab'));
+const AdminAnalyticsTab = lazy(() => import('../components/AdminTabs/AdminAnalyticsTab'));
+const AdminPaymentLinksTab = lazy(() => import('../components/AdminTabs/AdminPaymentLinksTab'));
 const AdminRiskTab = lazy(() => import('../components/AdminTabs/AdminRiskTab'));
 const AdminTransactionCenter = lazy(() => import('../components/AdminTabs/AdminTransactionCenter'));
 const AdminAuditLogTab = lazy(() => import('../components/AdminTabs/AdminAuditLogTab'));
@@ -38,6 +40,8 @@ export default function AdminPage() {
     { id: 'faq', label: 'FAQ' },
     { id: 'content', label: 'Content Editor' },
     { id: 'finance', label: 'Finance' },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'payment-links', label: 'Payment Links' },
     { id: 'transactions', label: 'Transactions' },
     { id: 'audit', label: 'Audit Log' },
     { id: 'readiness', label: 'Readiness' },
@@ -74,7 +78,7 @@ export default function AdminPage() {
     setActiveTab(tabId);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('tab', tabId);
-    if (!['payments', 'finance', 'risk', 'transactions', 'audit'].includes(tabId)) {
+    if (!['payments', 'finance', 'analytics', 'payment-links', 'risk', 'transactions', 'audit'].includes(tabId)) {
       nextParams.delete('section');
     }
     setSearchParams(nextParams);
@@ -130,6 +134,8 @@ export default function AdminPage() {
           {activeTab === 'faq' && <AdminFAQTab />}
           {activeTab === 'content' && <AdminContentTab />}
           {activeTab === 'finance' && <AdminFinanceTab />}
+          {activeTab === 'analytics' && <AdminAnalyticsTab />}
+          {activeTab === 'payment-links' && <AdminPaymentLinksTab />}
           {activeTab === 'transactions' && <AdminTransactionCenter />}
           {activeTab === 'audit' && <AdminAuditLogTab />}
           {activeTab === 'readiness' && <AdminReadinessTab />}

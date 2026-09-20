@@ -114,6 +114,26 @@ addCheck('workspace release verification script exists', hasScript(rootPackage, 
 addCheck('workspace staging verification script exists', hasScript(rootPackage, 'verify:staging'));
 addCheck('workspace Mini App bundle budget script exists', hasScript(rootPackage, 'check:miniapp:bundle'));
 addCheck('workspace secret scan script exists', hasScript(rootPackage, 'scan:secrets'));
+addCheck(
+  'backup and restore regression coverage exists',
+  fileExists('api/test/backupRestoreCheck.test.js'),
+  'Backup verification must include a tested restore-compatible SQLite copy and retention behavior.'
+);
+addCheck(
+  'tenant isolation regression coverage exists',
+  fileExists('api/test/tenantFinancialIsolation.test.js'),
+  'Financial queries and mutations must retain tenant isolation coverage.'
+);
+addCheck(
+  'Mini App Playwright coverage exists',
+  hasScript(miniappPackage, 'test:e2e') && fileExists('miniapp/tests/integration.spec.js') && fileExists('miniapp/tests/smoke.spec.js'),
+  'Critical Mini App workflows require executable Playwright coverage.'
+);
+addCheck(
+  'Mini App accessibility coverage exists',
+  readText('miniapp/tests/integration.spec.js').includes('color-contrast'),
+  'Playwright coverage must include automated color-contrast assertions.'
+);
 addCheck('staging verification script exists', fileExists('scripts/verify-staging.js'));
 addCheck('Mini App bundle budget script exists', fileExists('scripts/check-miniapp-bundle-budget.js'));
 addCheck('secret scan script exists', fileExists('scripts/scan-secrets.js'));
@@ -140,6 +160,52 @@ addCheck(
 addCheck('api client health route exists', readText('api/start/kernel.js').includes('/api/health/client'));
 addCheck('miniapp client health helper exists', readText('miniapp/src/lib/api.js').includes('getClientHealth'));
 addCheck('miniapp runtime diagnostics exist', readText('miniapp/src/context/MiniAppRuntimeContext.jsx').includes('diagnostics'));
+const providerExecutionSource = readText('api/core/financial/providerExecution.js');
+addCheck(
+  'provider execution boundary exports readiness guard',
+  providerExecutionSource.includes('assertProviderOperationReady') &&
+    providerExecutionSource.includes('executeProviderOperation'),
+  'Provider execution must fail closed before delegating to an adapter.'
+);
+addCheck(
+  'provider execution boundary enforces production environment',
+  providerExecutionSource.includes('PAYMENT_PROVIDER_ENVIRONMENT_MISMATCH') &&
+    providerExecutionSource.includes("environment !== 'production'"),
+  'Sandbox mutating operations must not execute in production.'
+);
+addCheck(
+  'provider execution regression test exists',
+  fileExists('api/test/providerExecution.test.js'),
+  'Focused provider execution regression coverage must be present.'
+);
+const financialRouteSources = [
+  'api/routes/invoiceRoutes.js',
+  'api/routes/providerRoutes.js',
+  'api/routes/payoutRoutes.js',
+  'api/routes/slipcraftUserRoutes.js',
+  'api/routes/adminRoutes.js'
+].map(readText).join('\n');
+addCheck(
+  'financial mutation routes enforce idempotency',
+  financialRouteSources.includes('requireIdempotencyKey') &&
+    readText('api/routes/invoiceRoutes.js').includes("router.post('/:id/cancel', requireIdempotencyKey") &&
+    readText('api/routes/providerRoutes.js').includes("router.post('/:provider/invoices', requireIdempotencyKey") &&
+    readText('api/routes/slipcraftUserRoutes.js').includes("router.post('/me/top-up-orders', requireAuthenticatedUser, fundingRateLimiter, requireIdempotencyKey"),
+  'Invoice, provider invoice, payout, funding, top-up, and admin financial mutations require Idempotency-Key.'
+);
+addCheck(
+  'idempotency middleware regression test exists',
+  fileExists('api/test/requireIdempotencyKey.test.js'),
+  'Focused middleware tests must cover missing, invalid, normalized, and provider-scoped keys.'
+);
+addCheck(
+  'recovery and provider admin mutations enforce idempotency',
+  readText('api/routes/adminRoutes.js').includes("router.post('/webhooks/:id/replay', requireAdminActor, requireIdempotencyKey") &&
+    readText('api/routes/adminRoutes.js').includes("router.post('/dead-letters/:id/recover', requireAdminActor, requireIdempotencyKey") &&
+    readText('api/routes/adminRoutes.js').includes("router.post('/reconciliation/run', requireAdminActor, requireIdempotencyKey") &&
+    readText('api/routes/adminRoutes.js').includes("router.post('/payment-issues/:id/resolve', requireAdminActor, requireIdempotencyKey"),
+  'Webhook replay, dead-letter recovery, reconciliation, and payment-ops mutations require Idempotency-Key.'
+);
 addCheck('shared provider workspace contract exists', fileExists('shared/providerWorkspaceContract.js'));
 addCheck('bot provider workspace compatibility module exists', fileExists('bot/utils/providerWorkspaces.js'));
 addCheck('bot provider miniapp parity test exists', fileExists('bot/tests/providerMiniappParity.test.js'));

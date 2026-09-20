@@ -43,6 +43,12 @@ const requiredFiles = [
   'api/repositories/automationRuleRepository.js',
   'api/services/automationRuleService.js',
   'api/services/automationDispatchService.js',
+  'api/scripts/backupRestoreCheck.js',
+  'api/test/backupRestoreCheck.test.js',
+  'api/test/tenantFinancialIsolation.test.js',
+  'api/core/financial/providerExecution.js',
+  'api/test/providerExecution.test.js',
+  'api/test/requireIdempotencyKey.test.js',
   'api/repositories/automationExecutionRepository.js',
   'api/repositories/organizationRepository.js',
   'api/services/organizationService.js',
@@ -57,7 +63,7 @@ for (const f of requiredFiles) {
 
 // 2. Check package scripts
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'api/package.json'), 'utf8'));
-const scripts = ['start', 'test', 'lint', 'db:migrate', 'smoke:providers', 'smoke:readiness', 'verify:paypal:sandbox'];
+const scripts = ['start', 'test', 'lint', 'db:migrate', 'backup', 'backup:verify', 'backup:prune', 'smoke:providers', 'smoke:readiness', 'verify:paypal:sandbox'];
 for (const s of scripts) {
   addCheck(`API script: ${s}`, pkg.scripts[s] ? 'PASS' : 'FAIL', pkg.scripts[s] || 'MISSING');
 }

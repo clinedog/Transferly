@@ -34,10 +34,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@lhci/cli": "0.15.1",
     "globals": "^17.7.0",
+    "http-server": "14.1.1",
+    "husky": "^9.0.0",
+    "lighthouse": "13.0.1",
     "postcss": "^8.5.26",
-    "postcss-safe-parser": "^7.0.1",
-    "husky": "^9.0.0"
+    "postcss-safe-parser": "^7.0.1"
   },
   "dependencies": {
     "playwright": "^1.62.1"

@@ -5,23 +5,38 @@ const { providerHealthService } = require('./providerHealthService');
 const { providerIncidentRepository } = require('../repositories/providerIncidentRepository');
 const { auditLogService } = require('./auditLogService');
 const { AppError } = require('../utils/errors');
+const config = require('../config');
 
 const ACTIVE_STATUSES = ['OPEN', 'ACKNOWLEDGED'];
 
-function incidentStatus(provider, issues) {
-  if (provider.status === 'critical' || issues.some((issue) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL')) {
+function incidentStatus(provider, issues, thresholds = config) {
+  const severeIssue = issues.some((issue) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL');
+  const repeatedWebhookFailures = Number(provider.failed_webhooks || 0) >= thresholds.PROVIDER_INCIDENT_FAILED_WEBHOOK_THRESHOLD;
+  const repeatedIssues = issues.length >= thresholds.PROVIDER_INCIDENT_OPEN_ISSUE_THRESHOLD;
+  if (provider.status === 'critical' || severeIssue || repeatedWebhookFailures || repeatedIssues) {
     return 'DETECTED';
   }
-  if (provider.status === 'degraded' || provider.status === 'watch' || issues.length) {
+
+  if (provider.status === 'degraded' || repeatedWebhookFailures || repeatedIssues) {
     return 'INVESTIGATING';
   }
+
   return null;
 }
 
-async function listProviderIncidents({ repository = providerIncidentRepository } = {}) {
+function incidentRunbook(provider) {
+  return `provider-${provider.provider}-incident`;
+}
+
+async function listProviderIncidents({
+  repository = providerIncidentRepository,
+  healthService = providerHealthService,
+  issueService = paymentOpsIssueService,
+  thresholds = config
+} = {}) {
   const [health, ...issueBatches] = await Promise.all([
-    providerHealthService.getProviderHealthReport(),
-    ...ACTIVE_STATUSES.map((status) => paymentOpsIssueService.listIssues({ status, limit: 250 }))
+    healthService.getProviderHealthReport(),
+    ...ACTIVE_STATUSES.map((status) => issueService.listIssues({ status, limit: 250 }))
   ]);
   const issuesByProvider = new Map();
   issueBatches.flat().forEach((issue) => {
@@ -33,7 +48,7 @@ async function listProviderIncidents({ repository = providerIncidentRepository }
 
   const derived = health.data.flatMap((provider) => {
     const issues = issuesByProvider.get(provider.provider) || [];
-    const status = incidentStatus(provider, issues);
+    const status = incidentStatus(provider, issues, thresholds);
     if (!status) return [];
     return [{
       id: `provider:${provider.provider}`,
@@ -51,7 +66,10 @@ async function listProviderIncidents({ repository = providerIncidentRepository }
         recent_webhooks: provider.recent_webhooks
       },
       issue_ids: issues.map((issue) => issue.id),
-      next_actions: provider.next_actions || []
+      next_actions: provider.next_actions || [],
+      runbookKey: incidentRunbook(provider),
+      runbookUrl: `/miniapp/ops?runbook=${encodeURIComponent(incidentRunbook(provider))}`,
+      ownerRole: 'operations'
     }];
   });
   await Promise.all(derived.map((incident) => repository.upsertActive(incident)));
@@ -61,7 +79,8 @@ async function listProviderIncidents({ repository = providerIncidentRepository }
 }
 
 const INCIDENT_TRANSITIONS = {
-  DETECTED: new Set(['INVESTIGATING']),
+  DETECTED: new Set(['ACKNOWLEDGED', 'INVESTIGATING']),
+  ACKNOWLEDGED: new Set(['INVESTIGATING', 'MITIGATED', 'RESOLVED']),
   INVESTIGATING: new Set(['MITIGATED', 'RESOLVED']),
   MITIGATED: new Set(['RESOLVED']),
   RESOLVED: new Set(['CLOSED']),

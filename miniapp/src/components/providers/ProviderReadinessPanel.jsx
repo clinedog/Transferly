@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { normalizeProviderRuntimeStatus } from '../../lib/providerWorkspaceContract.js';
 
 function formatStatus(status) {
   return String(status || 'coming_soon')
@@ -8,13 +9,20 @@ function formatStatus(status) {
 }
 
 function readinessTone(status) {
-  const normalized = String(status || '').toLowerCase();
-  if (['ready', 'healthy', 'active', 'live'].includes(normalized)) {
+  const normalized = normalizeProviderRuntimeStatus(status);
+
+  if (['ready', 'healthy', 'active', 'live', 'configured', 'authenticated', 'sandbox-ready', 'production-ready', 'webhook-ready', 'connected'].includes(normalized)) {
     return 'text-emerald-200';
   }
-  if (['degraded', 'needs_review', 'needs_env', 'needs_webhook'].includes(normalized)) {
+
+  if (['degraded', 'needs-review', 'needs-env', 'needs-webhook', 'not-configured', 'preview', 'pending', 'setup'].includes(normalized)) {
     return 'text-amber-100';
   }
+
+  if (['unavailable', 'disabled', 'unsupported', 'error', 'critical', 'failed'].includes(normalized)) {
+    return 'text-red-200';
+  }
+
   return 'text-[var(--tg-text-color)]';
 }
 

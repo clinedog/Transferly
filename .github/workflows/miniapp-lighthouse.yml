@@ -19,7 +19,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '20.x'
+
+      - name: Install root release tooling
+        run: npm ci
 
       - name: Install miniapp dependencies
         run: npm ci --prefix miniapp
@@ -28,28 +31,23 @@ jobs:
         run: npm run build --prefix miniapp
 
       - name: Install http-server and LHCI
-        run: npm ci -g http-server @lhci/cli || npm i -g http-server @lhci/cli
+        run: npm exec --no -- http-server --version && npm exec --no -- lhci --version
 
       - name: Serve miniapp (background)
-        run: npx http-server miniapp/dist -p 4173 &
+        run: npm exec --no -- http-server miniapp/dist -p 4173 &
 
       - name: Run LHCI autorun
         env:
-          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN || '' }}
-        run: npx @lhci/cli autorun --config=.lighthouserc.json || true
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+        run: npm exec --no -- lhci autorun --config=.lighthouserc.json
 
       - name: Archive LHCI artifacts (if produced)
         if: always()
         run: |
           mkdir -p lhci-reports
-          if [ -d ./.lighthouseci ]; then
-            cp -r ./.lighthouseci/* lhci-reports/ || true
-          fi
-          if [ -d ./lhci-reports ]; then
-            echo "LHCI artifacts prepared"
-          else
-            echo "No LHCI artifacts found"
-          fi
+          test -d ./.lighthouseci
+          cp -r ./.lighthouseci/* lhci-reports/
+          test -n "$(find lhci-reports -type f -print -quit)"
 
       - name: Upload LHCI artifacts
         if: always()

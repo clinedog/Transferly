@@ -41,6 +41,7 @@ import {
   getServiceCommandCenter,
   normalizeServiceCommandCenterView
 } from '../lib/serviceCommandCenters';
+import { normalizeProviderRuntimeStatus } from '../lib/providerWorkspaceContract';
 import { SurfaceCard } from '../components/ui';
 import {
   createStripeConnectedAccount,
@@ -127,17 +128,26 @@ function getLaneStatusCopy(lane) {
 }
 
 function getReadinessTone(status) {
-  if (status === 'configured') {
+  const normalized = normalizeProviderRuntimeStatus(status);
+
+  if (['configured', 'ready', 'healthy', 'active', 'live', 'connected', 'authenticated', 'sandbox-ready', 'production-ready', 'webhook-ready'].includes(normalized)) {
     return {
-      label: 'Configured',
+      label: normalized === 'sandbox-ready' ? 'Sandbox ready' : normalized === 'production-ready' ? 'Production ready' : normalized === 'webhook-ready' ? 'Webhook ready' : 'Configured',
       classes: 'border-emerald-200 bg-emerald-50 text-emerald-700'
     };
   }
 
-  if (status === 'not_configured') {
+  if (['not-configured', 'needs-env', 'needs-webhook', 'needs-review', 'pending', 'preview', 'degraded', 'setup', 'coming-soon', 'requires-setup'].includes(normalized)) {
     return {
-      label: 'Not configured',
+      label: normalized === 'not-configured' ? 'Not configured' : normalized === 'needs-review' ? 'Needs review' : normalized === 'needs-env' ? 'Needs env' : normalized === 'needs-webhook' ? 'Needs webhook' : normalized === 'preview' ? 'Preview' : normalized === 'degraded' ? 'Degraded' : normalized === 'coming-soon' ? 'Coming soon' : 'Setup',
       classes: 'border-amber-200 bg-amber-50 text-amber-700'
+    };
+  }
+
+  if (['unavailable', 'disabled', 'unsupported', 'error', 'critical', 'failed'].includes(normalized)) {
+    return {
+      label: 'Unavailable',
+      classes: 'border-rose-200 bg-rose-50 text-rose-700'
     };
   }
 
