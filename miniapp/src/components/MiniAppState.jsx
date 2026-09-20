@@ -102,10 +102,34 @@ const stateTone = {
     iconClassName: 'text-red-500',
     title: 'Configuration required',
     description: 'Transferly needs a production setting before this view can run safely.'
+  },
+  'session-expired': {
+    icon: LockKeyhole,
+    iconClassName: 'text-[var(--tg-button-color)]',
+    title: 'Secure session required',
+    description: 'Open Transferly from Telegram again or retry session verification.'
+  },
+  'coming-soon': {
+    icon: PlugZap,
+    iconClassName: 'text-[var(--miniapp-accent-pink)]',
+    title: 'Coming soon',
+    description: 'This capability is not available yet. Check back later.'
+  },
+  sandbox: {
+    icon: PlugZap,
+    iconClassName: 'text-[var(--tg-button-color)]',
+    title: 'Sandbox mode',
+    description: 'This operation is running in a safe test environment. Real funds are not affected.'
+  },
+  maintenance: {
+    icon: ServerCrash,
+    iconClassName: 'text-amber-400',
+    title: 'Maintenance in progress',
+    description: 'This Transferly capability is temporarily paused while we improve reliability.'
   }
 };
 
-const alertTones = new Set(['error', 'offline', 'unavailable', 'rate-limited', 'forbidden', 'auth', 'provider', 'config', 'unknown', 'reconciling', 'reconciliation']);
+const alertTones = new Set(['error', 'offline', 'unavailable', 'rate-limited', 'forbidden', 'auth', 'provider', 'config', 'unknown', 'reconciling', 'reconciliation', 'session-expired', 'maintenance']);
 
 export function MiniAppState({
   tone = 'loading',
