@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -27,20 +25,20 @@ textarea {
 
 html {
   scroll-behavior: smooth;
-  --tg-bg-color: #0b1524;
-  --tg-text-color: #f5f8ff;
-  --tg-hint-color: #7f91a8;
-  --tg-link-color: #6ab3f3;
-  --tg-button-color: #2aabee;
+  --tg-bg-color: #070b12;
+  --tg-text-color: #edf8fa;
+  --tg-hint-color: #82939d;
+  --tg-link-color: #20e6e6;
+  --tg-button-color: #20e6e6;
   --tg-button-text-color: #ffffff;
-  --tg-secondary-bg-color: #111f32;
-  --tg-section-bg-color: #15263a;
-  --tg-section-header-text-color: #6ab3f3;
-  --tg-subtitle-text-color: #8ea2b8;
-  --tg-destructive-text-color: #ff6b7a;
-  --tg-header-bg-color: #0b1524;
-  --tg-bottom-bar-bg-color: #0b1524;
-  --tg-accent-text-color: #6ab3f3;
+  --tg-secondary-bg-color: #0d1420;
+  --tg-section-bg-color: #111c29;
+  --tg-section-header-text-color: #20e6e6;
+  --tg-subtitle-text-color: #82939d;
+  --tg-destructive-text-color: #ff647c;
+  --tg-header-bg-color: #070b12;
+  --tg-bottom-bar-bg-color: #070b12;
+  --tg-accent-text-color: #ff4fa3;
   --tg-viewport-width: 100vw;
   --tg-viewport-height: 100dvh;
   --tg-viewport-stable-height: 100dvh;
@@ -64,16 +62,19 @@ html {
   --miniapp-bottom-content-padding: calc(
     var(--miniapp-bottom-nav-height) + var(--miniapp-bottom-nav-gap) + var(--miniapp-safe-area-bottom) + 28px
   );
-  --miniapp-radius-card: 1.5rem;
-  --miniapp-radius-control: 0.875rem;
-  --miniapp-shadow-card: 0 18px 50px color-mix(in srgb, #020817 18%, transparent);
+  --miniapp-radius-card: 1.35rem;
+  --miniapp-radius-control: 1rem;
+  --miniapp-shadow-card: 0 18px 50px rgba(0, 0, 0, 0.24);
   --miniapp-shadow-focus: 0 0 0 3px var(--miniapp-focus-ring);
   --miniapp-type-display-xl: clamp(2.25rem, 9vw, 4rem);
   --miniapp-type-display-l: clamp(2rem, 7vw, 3rem);
   --miniapp-type-display-m: clamp(1.75rem, 6vw, 2.25rem);
   --miniapp-type-financial: clamp(1.75rem, 8vw, 2.75rem);
-  --miniapp-font-body: 'Nunito', ui-sans-serif, system-ui, sans-serif;
-  --miniapp-font-display: 'Space Grotesk', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --miniapp-font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --miniapp-font-display: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --miniapp-font-mono: 'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --miniapp-accent-pink: #ff4fa3;
+  --miniapp-accent-cyan: #20e6e6;
   --dracula-background: #282a36;
   --dracula-surface: #44475a;
   --dracula-surface-elevated: #4d5064;
@@ -123,10 +124,10 @@ body {
 }
 
 .transferly-miniapp-skin {
-  --miniapp-bg: var(--tg-bg-color, #0b1524);
-  --miniapp-shell-bg: color-mix(in srgb, var(--tg-bg-color, #0b1524) 94%, #020817 6%);
-  --miniapp-panel-bg: color-mix(in srgb, var(--tg-secondary-bg-color, #111f32) 84%, #020817 16%);
-  --miniapp-card-bg: color-mix(in srgb, var(--tg-section-bg-color, #15263a) 88%, #020817 12%);
+  --miniapp-bg: var(--tg-bg-color, #070b12);
+  --miniapp-shell-bg: color-mix(in srgb, var(--tg-bg-color, #070b12) 94%, #02050a 6%);
+  --miniapp-panel-bg: color-mix(in srgb, var(--tg-secondary-bg-color, #0d1420) 88%, #02050a 12%);
+  --miniapp-card-bg: color-mix(in srgb, var(--tg-section-bg-color, #111c29) 92%, #02050a 8%);
   --miniapp-surface: var(--miniapp-panel-bg);
   --miniapp-surface-elevated: color-mix(in srgb, var(--miniapp-panel-bg) 86%, var(--tg-button-color, #2aabee) 14%);
   --miniapp-card-surface: var(--miniapp-card-bg);
@@ -149,16 +150,16 @@ body {
   --miniapp-nav-hover-bg: color-mix(in srgb, var(--tg-button-color, #2aabee) 10%, transparent);
   --miniapp-accent-soft: color-mix(in srgb, var(--tg-button-color, #2aabee) 18%, transparent);
   --miniapp-accent-border: color-mix(in srgb, var(--tg-button-color, #2aabee) 34%, transparent);
-  --miniapp-positive: #34d399;
-  --miniapp-warning: #fbbf24;
+  --miniapp-positive: #46e6a3;
+  --miniapp-warning: #f3d36b;
   --miniapp-destructive: var(--tg-destructive-text-color, #ff6b7a);
   --miniapp-info: var(--tg-link-color, #6ab3f3);
   --miniapp-focus-ring: color-mix(in srgb, var(--tg-button-color, #2aabee) 48%, transparent);
   --miniapp-overlay: rgba(2, 8, 23, 0.72);
   --miniapp-navigation-bg: var(--miniapp-bottom-panel-bg);
   --miniapp-active-navigation-state: var(--miniapp-nav-active-bg);
-  --miniapp-logo-badge-start: color-mix(in srgb, var(--tg-button-color, #2aabee) 86%, #1d4ed8 14%);
-  --miniapp-logo-badge-end: color-mix(in srgb, var(--tg-link-color, #6ab3f3) 46%, #3730a3 54%);
+  --miniapp-logo-badge-start: color-mix(in srgb, var(--tg-button-color, #20e6e6) 86%, #0b7f91 14%);
+  --miniapp-logo-badge-end: color-mix(in srgb, var(--miniapp-accent-pink) 46%, #5b1b59 54%);
   --miniapp-logo-foreground: #ffffff;
   --miniapp-logo-wordmark: var(--tg-text-color, #f5f8ff);
   --miniapp-logo-secondary: color-mix(in srgb, var(--tg-subtitle-text-color, #8ea2b8) 88%, var(--tg-text-color, #f5f8ff) 12%);
@@ -176,6 +177,23 @@ body {
 .miniapp-type-financial {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
+}
+
+.miniapp-mono-meta {
+  font-family: var(--miniapp-font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.miniapp-accent-text {
+  color: var(--miniapp-accent-pink);
+}
+
+.miniapp-accent-cyan {
+  color: var(--miniapp-accent-cyan);
 }
 
 .miniapp-type-display-xl {
@@ -442,7 +460,7 @@ button:disabled,
 
 .miniapp-surface-card-interactive:hover {
   transform: translateY(-2px);
-  box-shadow: var(--miniapp-shadow-card), 0 0 0 1px var(--miniapp-accent-border);
+  box-shadow: var(--miniapp-shadow-card), 0 0 0 1px var(--miniapp-accent-border), 0 10px 28px rgba(32, 230, 230, 0.08);
 }
 
 .miniapp-surface-card-interactive:focus-visible {

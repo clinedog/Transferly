@@ -14,7 +14,14 @@ export default {
       // COLORS - Premium Color Palette
       // ====================================================================
       colors: {
-        brand: '#f8812d',
+        brand: '#20e6e6',
+        'telgrapp-bg': '#070b12',
+        'telgrapp-card': '#0d1420',
+        'telgrapp-surface': '#111c29',
+        'telgrapp-border': '#1e2c3b',
+        'telgrapp-cyan': '#20e6e6',
+        'telgrapp-pink': '#ff4fa3',
+        'telgrapp-muted': '#82939d',
         // Semantic colors with depth
         success: {
           50: '#f0fdf4',
