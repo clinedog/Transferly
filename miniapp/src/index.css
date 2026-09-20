@@ -668,6 +668,19 @@ button:disabled,
   }
 }
 
+@media (prefers-contrast: more) {
+  :root {
+    --miniapp-border-color: color-mix(in srgb, var(--tg-text-color, #f5f8ff) 34%, transparent);
+    --miniapp-divider: color-mix(in srgb, var(--tg-text-color, #f5f8ff) 26%, transparent);
+    --miniapp-focus-ring: var(--tg-button-color, #2aabee);
+  }
+
+  :where(button, a, input, select, textarea, [role='button']):focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+}
+
 .route-transition-view::before {
   position: fixed;
   inset: 0 0 auto;
