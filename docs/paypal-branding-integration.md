@@ -1,5 +1,8 @@
 # PayPal provider workspace
 
+The page-by-page Sandbox simulator work is tracked in
+[PayPal Sandbox Simulator Implementation Plan](./paypal-sandbox-simulator-implementation-plan.md).
+
 ## Scope and brand boundary
 
 Transferly presents PayPal as a connected payment provider within a Transferly-owned Mini App workspace. The workspace may use approved PayPal assets, relevant provider terminology, and links to official PayPal resources, but it must not imitate a PayPal wallet, native app, dashboard, email, or account screen.

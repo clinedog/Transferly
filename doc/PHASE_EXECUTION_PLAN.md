@@ -3,7 +3,7 @@
 **Author**: Copilot (Senior Staff Engineer)  
 **Date**: 2026-09-20  
 **Scope**: Complete remaining phases of mini.md production upgrade  
-**Status**: Active (Phases 15-28 in flight)
+**Status**: Active; release gate green, with product and architecture follow-up phases still in progress
 
 ---
 
@@ -49,6 +49,20 @@ This document drives completion of all 14 remaining phases (15-28) of the Transf
 ---
 
 ## CURRENT BASELINE
+
+### Verified release milestone — 2026-09-20
+
+The repository-backed release gate is green:
+
+- API suite: 629 passing.
+- Bot suite: 64 passing.
+- Mini App provider contract tests, lint, and production build passing.
+- Backup/restore regression: 4 passing, including operation-marked manifest validation.
+- Production readiness, staging readiness, bundle budgets, and secret scan passing.
+- Mini App activity timeline uses 25-event pagination and accessible page controls.
+- Centralized service pricing is documented and covered: default charge 250 points, with service overrides taking precedence.
+
+These checks prove the current release candidate is internally consistent. They do not mark the remaining product, security, database, or real-device phases complete.
 
 ### Mini App Status
 ✅ **Strengths**:
@@ -154,7 +168,7 @@ This document drives completion of all 14 remaining phases (15-28) of the Transf
 - [ ] Optimize bundle with `npm run build` verification
 - [ ] Optimize images and SVG assets
 - [ ] Implement skeleton loading for critical paths
-- [ ] Add pagination/virtualization for large lists
+- [x] Add pagination/virtualization for large lists
 - [ ] Debounce search input
 - [ ] Profile renders with React DevTools
 - [ ] Set and enforce bundle size budgets
@@ -167,6 +181,12 @@ This document drives completion of all 14 remaining phases (15-28) of the Transf
 - Cumulative Layout Shift < 0.1
 - Bundle size < 350KB (gzipped)
 - No console errors/warnings (except 3rd party)
+
+**Verified in current release candidate**:
+- [x] Safe-read request deduplication
+- [x] Activity timeline pagination
+- [x] Production bundle budget enforcement
+- [x] Route-level lazy loading and production build
 
 ---
 
@@ -360,6 +380,14 @@ This document drives completion of all 14 remaining phases (15-28) of the Transf
 - Team trained on recovery procedures
 - Backup retention meets compliance
 
+**Verified in current release candidate**:
+- [x] Checksummed SQLite backup verification
+- [x] Operation-marked evidence manifest validation
+- [x] Tamper rejection regression coverage
+- [x] Retention pruning regression coverage
+
+Live off-host storage, restore drills, queue recovery, and owner training still require deployment-environment evidence.
+
 ---
 
 ### PHASE 24 — RELEASE CONFIDENCE & DEPLOYMENT SAFETY
@@ -400,6 +428,14 @@ This document drives completion of all 14 remaining phases (15-28) of the Transf
 - Zero production incidents caused by deployment
 - Rollback procedure works and is documented
 - All team members trained on release process
+
+**Verified in current release candidate**:
+- [x] Full `npm run verify:release` gate
+- [x] Production readiness gate
+- [x] Staging shape gate
+- [x] Mini App bundle budget gate
+- [x] Secret scan gate
+- [x] Provider, idempotency, tenant-isolation, and recovery readiness checks
 
 ---
 

@@ -1785,7 +1785,20 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
   ].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
 }
 
+function buildTransactionSupportHref(event) {
+  const params = new URLSearchParams({
+    from: 'activity',
+    transaction: String(event?.search || ''),
+    provider: String(event?.provider || ''),
+    operation: String(event?.operation || ''),
+    status: String(event?.status || '')
+  });
+
+  return `/miniapp/support?${params.toString()}`;
+}
+
 export function ActivitySection() {
+  const ACTIVITY_PAGE_SIZE = 25;
   const context = useAppContext();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -1796,6 +1809,8 @@ export function ActivitySection() {
   const [dateTo, setDateTo] = useState('');
   const [amountMax, setAmountMax] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState('newest');
   const events = buildActivity(context);
   const providers = [...new Set(events.map((event) => event.provider).filter(Boolean))].sort();
   const currencies = [...new Set(events.map((event) => event.currency).filter(Boolean))].sort();
@@ -1810,6 +1825,19 @@ export function ActivitySection() {
     const matchesQuery = [event.title, event.body, event.search].join(' ').toLowerCase().includes(query.toLowerCase());
     return matchesCategory && matchesProvider && matchesStatus && matchesCurrency && matchesDateFrom && matchesDateTo && matchesAmount && matchesQuery;
   });
+  const sorted = [...filtered].sort((left, right) => {
+    if (sort === 'oldest') return (left.timestamp || 0) - (right.timestamp || 0);
+    if (sort === 'amount-high') return (right.amount || 0) - (left.amount || 0);
+    if (sort === 'amount-low') return (left.amount || 0) - (right.amount || 0);
+    return (right.timestamp || 0) - (left.timestamp || 0);
+  });
+  const pageCount = Math.max(1, Math.ceil(sorted.length / ACTIVITY_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginated = sorted.slice((currentPage - 1) * ACTIVITY_PAGE_SIZE, currentPage * ACTIVITY_PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+    setSelectedEvent(null);
+  }, [query, category, provider, status, currency, dateFrom, dateTo, amountMax, sort]);
   const filters = [
     ['all', 'All'],
     ['payments', 'Payments'],
@@ -1824,10 +1852,12 @@ export function ActivitySection() {
   return (
     <div className="space-y-4">
       <SuiteHeader eyebrow="Live activity" title="Every meaningful state change in one place." body="Invoices, payouts, wallet orders, receipts, provider issues, and webhook events become a searchable operational timeline." icon={Activity} />
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard icon={Activity} label="Events" value={filtered.length.toLocaleString()} />
-        <MetricCard icon={ShieldCheck} label="Verified" value={filtered.filter((event) => event.tone === 'success').length.toLocaleString()} />
+        <MetricCard icon={ShieldCheck} label="Completed" value={filtered.filter((event) => event.tone === 'success').length.toLocaleString()} />
+        <MetricCard icon={Clock3} label="Pending" value={filtered.filter((event) => ['PENDING', 'PROCESSING'].includes(event.status)).length.toLocaleString()} />
         <MetricCard icon={AlertTriangle} label="Attention" value={filtered.filter((event) => ['warn', 'danger'].includes(event.tone)).length.toLocaleString()} />
+        <MetricCard icon={ShieldAlert} label="Reconciliation" value={filtered.filter((event) => ['UNKNOWN', 'RECONCILING', 'RECONCILIATION_REQUIRED'].includes(event.status)).length.toLocaleString()} />
       </div>
       <SearchBar query={query} onQuery={setQuery} placeholder="Search timeline" />
       <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Activity filters">
@@ -1881,17 +1911,54 @@ export function ActivitySection() {
           Maximum amount
           <input type="number" min="0" inputMode="decimal" value={amountMax} onChange={(event) => setAmountMax(event.target.value)} placeholder="Any amount" className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)] placeholder:text-[var(--tg-hint-color)]" />
         </label>
+        <label className="text-xs font-black text-[var(--tg-hint-color)]">
+          Sort activity
+          <select value={sort} onChange={(event) => setSort(event.target.value)} className="mt-1 min-h-[44px] w-full rounded-[16px] bg-[var(--tg-section-bg-color)] px-3 text-sm font-bold text-[var(--tg-text-color)]">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="amount-high">Highest amount</option>
+            <option value="amount-low">Lowest amount</option>
+          </select>
+        </label>
       </div>
       {filtered.length ? (
         <>
           <SurfaceCard className="p-5 shadow-sm">
             <Timeline
-              events={filtered.map((event) => ({
+              events={paginated.map((event) => ({
                 ...event,
                 onSelect: () => setSelectedEvent(event)
               }))}
             />
           </SurfaceCard>
+          {pageCount > 1 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Activity pagination">
+              <p className="text-xs font-bold text-[var(--tg-hint-color)]">
+                Showing {(currentPage - 1) * ACTIVITY_PAGE_SIZE + 1}-{Math.min(currentPage * ACTIVITY_PAGE_SIZE, filtered.length)} of {filtered.length} events
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  disabled={currentPage === 1}
+                  className="miniapp-touch-target rounded-full border border-[var(--miniapp-border-color)] px-4 py-2 text-xs font-black text-[var(--tg-text-color)] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Previous
+                </button>
+                <span className="min-w-16 text-center text-xs font-black text-[var(--tg-hint-color)]" aria-live="polite">
+                  Page {currentPage} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                  disabled={currentPage === pageCount}
+                  className="miniapp-touch-target rounded-full border border-[var(--miniapp-border-color)] px-4 py-2 text-xs font-black text-[var(--tg-text-color)] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
           {selectedEvent ? (
             <SurfaceCard as="section" aria-label="Transaction detail" className="border-[var(--miniapp-accent-border)] p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -1922,6 +1989,21 @@ export function ActivitySection() {
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Timeline</p>
                 <Timeline events={[selectedEvent]} />
               </SurfaceCard>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--miniapp-accent-border)] bg-[var(--tg-secondary-bg-color)] p-4">
+                <div>
+                  <p className="text-sm font-black text-[var(--tg-text-color)]">Need help with this activity?</p>
+                  <p className="mt-1 text-xs font-semibold text-[var(--tg-subtitle-text-color)]">
+                    Share a safe transaction reference and state with the support desk.
+                  </p>
+                </div>
+                <Link
+                  to={buildTransactionSupportHref(selectedEvent)}
+                  className="miniapp-touch-target inline-flex items-center gap-2 rounded-full bg-[var(--tg-button-color)] px-4 py-2 text-xs font-black text-[var(--tg-button-text-color)]"
+                >
+                  <MessageCircle size={15} aria-hidden="true" />
+                  Report an issue
+                </Link>
+              </div>
               {['UNKNOWN', 'RECONCILING', 'RECONCILIATION', 'RECONCILIATION_REQUIRED'].includes(String(selectedEvent.status || '').toUpperCase()) ? (
                 <p className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
                   Transaction outcome is being verified. Do not submit a duplicate retry until reconciliation is complete.

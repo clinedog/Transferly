@@ -688,6 +688,13 @@ function PayPalOverview({ dashboard, resource }) {
     ['Readiness', 'Review configuration, environment, and setup status.', 'Sandbox/live mode, webhook state, and required env', ShieldCheck],
     ['Balance / Status', 'Operational snapshots and provider health at a glance.', 'Provider readiness, health, and activity status', WalletCards]
   ];
+  const businessTools = [
+    ['Collections', 'Create and track invoices and payment links.', getProviderWorkspaceRoute('paypal', 'invoices'), FileText],
+    ['Payments', 'Review captures, refunds, and payment readiness.', getProviderWorkspaceRoute('paypal', 'payments'), WalletCards],
+    ['Activity', 'Search transactions and reconciliation evidence.', getProviderWorkspaceRoute('paypal', 'transactions'), Activity],
+    ['Developer', 'Inspect webhooks, API readiness, and diagnostics.', getProviderWorkspaceRoute('paypal', 'developer'), Code2],
+    ['Settings', 'Review sandbox configuration and provider posture.', getProviderWorkspaceRoute('paypal', 'settings'), Settings]
+  ];
   const quickActions = [
     ['Open Hosted Invoice', getProviderWorkspaceRoute('paypal', 'invoices'), ExternalLink, true, Boolean(hostedInvoiceLink), 'No hosted PayPal invoice link is available yet.'],
     ['Copy Invoice Link', getProviderWorkspaceRoute('paypal', 'invoices'), Copy, false, Boolean(hostedInvoiceLink), 'No hosted PayPal invoice link is available yet.'],
@@ -749,13 +756,14 @@ function PayPalOverview({ dashboard, resource }) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#003087]">PayPal</span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#003087]">PayPal adapter</span>
+              <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-black text-blue-50">Transferly Sandbox Simulator</span>
               <StatusPill status={environmentLabel} />
               <StatusPill status={readinessLabel} />
             </div>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">PayPal Console</h2>
-            <p className="mt-2 text-base font-bold leading-7 text-blue-50">Hosted PayPal workspace inside Transferly</p>
-            <p className="mt-3 text-sm font-semibold leading-6 text-blue-100">Invoices, payouts, transactions, webhooks, and readiness in one view</p>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">Sandbox provider console</h2>
+            <p className="mt-2 text-base font-bold leading-7 text-blue-50">PayPal-compatible workflows inside Transferly</p>
+            <p className="mt-3 text-sm font-semibold leading-6 text-blue-100">Synthetic test data only. No live PayPal account, credentials, or funds are accessed from this simulator.</p>
           </div>
           <div className="rounded-[26px] border border-white/15 bg-white/10 p-4 text-sm font-bold text-blue-50 backdrop-blur">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-100">Workspace status</p>
@@ -764,6 +772,19 @@ function PayPalOverview({ dashboard, resource }) {
           </div>
         </div>
       </section>
+
+      <PayPalSection title="Business tools" description="Navigate the provider-console workflows supported by this Transferly sandbox adapter.">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {businessTools.map(([label, detail, to, Icon]) => (
+            <PayPalButton key={label} to={to} icon={Icon}>
+              <span className="flex flex-col items-start">
+                <span>{label}</span>
+                <span className="mt-1 text-left text-[11px] font-semibold leading-4 text-[var(--tg-subtitle-text-color)]">{detail}</span>
+              </span>
+            </PayPalButton>
+          ))}
+        </div>
+      </PayPalSection>
 
       <PayPalSection id="paypal-quick-actions" title="PayPal overview quick actions" description="Premium shortcuts for hosted invoice, payout, transaction, webhook, readiness, and settings workflows.">
         <div className="flex flex-wrap gap-2">
@@ -1039,9 +1060,32 @@ function PayPalInvoiceLane({ readiness }) {
       <LaneHeader
         eyebrow="PayPal Invoicing API"
         title="Invoices"
-        body="PayPal invoice collection, hosted payment link access, reminders, QR generation, and status refresh."
+        body="Collections for provider-backed invoices, hosted payment links, reminders, QR generation, and status refresh."
       />
       <ReadinessPanel readiness={readiness} />
+      <PayPalSection id="paypal-payment-links" title="Payment Links & Buttons" description="Use hosted links generated from Transferly invoice records. This simulator never creates an official PayPal-branded checkout page.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[#0070e0]/20 bg-[#0070e0]/10 p-4">
+            <p className="font-black text-[var(--tg-text-color)]">Create a hosted collection link</p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--tg-subtitle-text-color)]">
+              Start from the shared invoice workflow so amount, currency, recipient, ledger state, and idempotency checks stay together.
+            </p>
+            <div className="mt-3">
+              <PayPalButton to={getProviderWorkspaceRoute('paypal', 'invoices')} primary icon={ExternalLink}>
+                Open invoice builder
+              </PayPalButton>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="font-black text-[var(--tg-text-color)]">Hosted-link safety</p>
+            <ul className="mt-2 space-y-2 text-sm font-semibold leading-6 text-[var(--tg-subtitle-text-color)]">
+              <li>Links remain tied to an invoice and provider status.</li>
+              <li>Expired, cancelled, or unpaid records are not shown as completed.</li>
+              <li>Transferly’s internal ledger remains authoritative.</li>
+            </ul>
+          </div>
+        </div>
+      </PayPalSection>
       <CapabilityList
         title="Available invoice actions"
         items={['Open Hosted Invoice', 'Copy Hosted Link', 'Send Reminder', 'Cancel Auto Reminders', 'Generate QR', 'Refresh Invoice', 'Cancel Invoice']}

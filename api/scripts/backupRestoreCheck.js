@@ -76,7 +76,11 @@ async function verifyDatabase(databasePath) {
       } catch (error) {
         throw new Error(`Backup evidence manifest is invalid: ${error.message}`);
       }
-      if (manifest.databasePath !== databasePath || manifest.checksum !== checksum) {
+      if (
+        manifest.operation !== 'backup' ||
+        manifest.databasePath !== databasePath ||
+        manifest.checksum !== checksum
+      ) {
         throw new Error(`Backup evidence manifest does not match ${databasePath}`);
       }
     }

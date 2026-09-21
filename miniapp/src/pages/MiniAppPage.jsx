@@ -292,6 +292,7 @@ function buildProviderWorkspaceRedirect(search, target) {
 }
 
 const DEFAULT_SCREEN_KEY = 'transferly_miniapp_default_screen';
+const NOTIFICATION_PREFERENCES_KEY = 'transferly_miniapp_notification_preferences';
 const TELEGRAM_BOT_URL = 'https://t.me/TransferlyBot';
 
 const defaultScreenOptions = [
@@ -4293,7 +4294,7 @@ function RecentActivityPreview({ receipts, topUpOrders, paymentIssues }) {
   );
 }
 
-function buildSupportContext({ source, telegram, profile, user, receipts, topUpOrders, paymentIssues }) {
+function buildSupportContext({ source, transaction, provider, operation, status, issueType, issueDetails, telegram, profile, user, receipts, topUpOrders, paymentIssues }) {
   const latestOrder = topUpOrders[0];
   const latestReceipt = receipts[0];
 
@@ -4306,7 +4307,15 @@ function buildSupportContext({ source, telegram, profile, user, receipts, topUpO
     `Points: ${Number(profile?.points || 0).toLocaleString()}`,
     `Latest order: ${latestOrder?.order_id || latestOrder?.id || 'none'} ${latestOrder?.status || ''}`.trim(),
     `Latest receipt: ${latestReceipt?.id || latestReceipt?.title || 'none'}`,
-    `Open payment issues: ${paymentIssues.length.toLocaleString()}`
+    `Open payment issues: ${paymentIssues.length.toLocaleString()}`,
+    ...(transaction ? [
+      `Reported transaction: ${transaction}`,
+      `Reported provider: ${provider || 'unavailable'}`,
+      `Reported operation: ${operation || 'unavailable'}`,
+      `Reported status: ${status || 'UNKNOWN'}`
+    ] : []),
+    `Issue category: ${issueType || 'transaction review'}`,
+    `Issue details: ${issueDetails || 'not provided'}`
   ].join('\n');
 }
 
@@ -4315,10 +4324,18 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
   const { configureMainButton, notify } = telegram;
   const [query, setQuery] = useState('');
   const [openQuestion, setOpenQuestion] = useState(supportFaqs[0]?.question || '');
+  const [issueType, setIssueType] = useState('transaction review');
+  const [issueDetails, setIssueDetails] = useState('');
   const supportContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return buildSupportContext({
       source: params.get('from') || params.get('screen') || 'support',
+      transaction: params.get('transaction'),
+      provider: params.get('provider'),
+      operation: params.get('operation'),
+      status: params.get('status'),
+      issueType,
+      issueDetails,
       telegram,
       profile,
       user,
@@ -4326,7 +4343,7 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
       topUpOrders,
       paymentIssues
     });
-  }, [location.search, paymentIssues, profile, receipts, telegram, topUpOrders, user]);
+  }, [issueDetails, issueType, location.search, paymentIssues, profile, receipts, telegram, topUpOrders, user]);
 
   const copyContext = useCallback(async () => {
     try {
@@ -4373,6 +4390,42 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
               The premium support flow should attach current screen, user, order, receipt, and provider context before handoff.
             </p>
           </div>
+        </div>
+      </section>
+      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Issue handoff</p>
+        <h3 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Tell support what needs attention</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
+          Add a short description before copying the bundle. Nothing is submitted automatically.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <label className="text-xs font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">
+            Category
+            <select
+              value={issueType}
+              onChange={(event) => setIssueType(event.target.value)}
+              className="mt-2 min-h-12 w-full rounded-[18px] bg-[var(--tg-secondary-bg-color)] px-3 text-sm font-bold normal-case tracking-normal text-[var(--tg-text-color)] outline-none"
+              aria-label="Support issue category"
+            >
+              <option value="transaction review">Transaction review</option>
+              <option value="funding or points">Funding or points</option>
+              <option value="account access">Account access</option>
+              <option value="provider availability">Provider availability</option>
+              <option value="bug report">Bug report</option>
+            </select>
+          </label>
+          <label className="text-xs font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">
+            Details
+            <textarea
+              value={issueDetails}
+              onChange={(event) => setIssueDetails(event.target.value.slice(0, 500))}
+              placeholder="What happened, and what outcome do you need?"
+              rows={3}
+              maxLength={500}
+              className="mt-2 w-full resize-y rounded-[18px] bg-[var(--tg-secondary-bg-color)] px-3 py-3 text-sm font-bold normal-case tracking-normal text-[var(--tg-text-color)] outline-none placeholder:text-[var(--tg-hint-color)]"
+              aria-label="Support issue details"
+            />
+          </label>
         </div>
       </section>
       <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
@@ -4862,6 +4915,20 @@ function SettingsSection({ telegram, profile, user }) {
     const stored = readStoredMiniAppSetting(DEFAULT_SCREEN_KEY, 'studio');
     return defaultScreenOptions.some((option) => option.id === stored) ? stored : 'studio';
   });
+  const [notificationPreferences, setNotificationPreferences] = useState(() => {
+    const fallback = { funding: true, operations: true, security: true };
+    if (typeof window === 'undefined') {
+      return fallback;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(NOTIFICATION_PREFERENCES_KEY);
+      const parsed = stored ? JSON.parse(stored) : null;
+      return parsed && typeof parsed === 'object' ? { ...fallback, ...parsed } : fallback;
+    } catch {
+      return fallback;
+    }
+  });
 
   const selectedScreen = defaultScreenOptions.find((option) => option.id === defaultScreen) || defaultScreenOptions[1];
 
@@ -4870,6 +4937,12 @@ function SettingsSection({ telegram, profile, user }) {
       window.localStorage.setItem(DEFAULT_SCREEN_KEY, defaultScreen);
     }
   }, [defaultScreen]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(NOTIFICATION_PREFERENCES_KEY, JSON.stringify(notificationPreferences));
+    }
+  }, [notificationPreferences]);
 
   const openSelectedScreen = useCallback(() => {
     impact('medium');
@@ -4946,6 +5019,48 @@ function SettingsSection({ telegram, profile, user }) {
               <Vibrate size={17} />
             </span>
           </button>
+        </div>
+      </section>
+
+      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[17px] bg-[var(--tg-secondary-bg-color)] text-[var(--tg-button-color)]">
+            <Bell size={19} />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Notification preferences</p>
+            <h3 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Choose what this device highlights</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
+              These controls only tune local presentation. Authoritative notifications remain available in the Notifications workspace.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {[
+            ['funding', 'Funding and points', 'Top-up requests, balances, and point changes'],
+            ['operations', 'Invoices and payouts', 'Provider updates and action-required records'],
+            ['security', 'Security and access', 'Session, identity, and safety notices']
+          ].map(([key, label, description]) => {
+            const enabled = notificationPreferences[key] !== false;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="switch"
+                aria-checked={enabled}
+                onClick={() => setNotificationPreferences((current) => ({ ...current, [key]: !enabled }))}
+                className="flex min-h-16 w-full items-center justify-between gap-4 rounded-[20px] bg-[var(--tg-secondary-bg-color)] px-4 py-3 text-left transition active:scale-[0.99]"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-[var(--tg-text-color)]">{label}</span>
+                  <span className="mt-1 block text-xs font-semibold text-[var(--tg-subtitle-text-color)]">{description}</span>
+                </span>
+                <span className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition ${enabled ? 'justify-end bg-[var(--tg-button-color)]' : 'justify-start bg-black/10'}`}>
+                  <span className={`h-6 w-6 rounded-full shadow-sm ${enabled ? 'bg-[var(--tg-button-text-color)]' : 'bg-[var(--tg-hint-color)]'}`} />
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 

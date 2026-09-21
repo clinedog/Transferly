@@ -38,3 +38,39 @@ Override these only when a reviewed product change justifies the growth:
 - Treat failed production readiness checks as release blockers unless the failed check is documented as intentionally out of scope for that deployment.
 - Fix root causes instead of removing checks or weakening validation.
 - If external credentials are unavailable, report the exact missing variable names and run the non-credentialed gates.
+
+## Evidence Recorded by the Current Gate
+
+The current release gate has verified the following repository-backed controls:
+
+- API suite: 629 tests passing.
+- Bot suite: 64 tests passing.
+- Mini App provider contract tests and production build passing.
+- Backup verification: checksummed SQLite copy, operation-marked evidence manifest, tamper rejection, and retention pruning.
+- Production readiness: required ecosystem files, environment documentation, provider contracts, idempotency controls, tenant-isolation coverage, and recovery coverage.
+- Staging readiness: environment-shape checks pass; live secret validation remains opt-in through `STAGING_STRICT=true` or `NODE_ENV=staging`.
+- Bundle budgets: 2,000,000 raw JavaScript bytes, 700,000 gzip JavaScript bytes, 400,000 CSS bytes, and 900,000 bytes per asset.
+- Secret scan: no high-confidence committed secret patterns detected.
+
+The gate is evidence-based but does not replace deployment-specific checks. Operators must still validate live credentials, webhook delivery, queue health, reconciliation status, and provider readiness in the target environment.
+
+## Financial Contract Evidence
+
+The centralized points contract is:
+
+- `1 Transferly Point = NGN1` for the configured economy.
+- The default service charge is `250` points.
+- A service-level point-price override takes precedence over the default.
+- Legacy receipt generation is restricted to permanently marked sandbox services and must include all configured safety markings.
+
+The implementation and regression coverage live in `api/services/pointPricingService.js`, `api/services/slipcraftReceiptService.js`, and `api/test/defaultServicePricing.test.js`. Release tests should provision enough points for the configured service charge rather than assuming a legacy fixed price.
+
+## State and Recovery Evidence
+
+Financial UI and API consumers must preserve explicit states instead of converting uncertainty into success:
+
+- `UNKNOWN` and reconciliation states require investigation or refresh.
+- Failed or cancelled states must not be presented as completed.
+- Provider status is evidence for reconciliation, not the ledger source of truth.
+- Retryable failures must retain idempotency and avoid duplicate balance mutations.
+- Backup verification must pass before a release is promoted.

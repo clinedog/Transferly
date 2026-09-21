@@ -674,7 +674,15 @@ async function mockTransferlyApi(page, options = {}) {
         referrals: {},
         receipts: [receiptRecord],
         topUpOrders: [],
-        pointsFundingRequests: []
+        pointsFundingRequests: [],
+        invoices: {
+          data: [invoiceRecord, stripeInvoiceRecord],
+          pagination: { page: 1, page_size: 50, total: 2, has_next_page: false }
+        },
+        payouts: {
+          data: [payoutRecord],
+          pagination: { page: 1, page_size: 50, total: 1, has_next_page: false }
+        }
       });
       return;
     }
@@ -1437,6 +1445,12 @@ test('mini app activity exposes transaction center filters', async ({ page }) =>
   await expect(page.getByLabel('From date')).toBeVisible();
   await expect(page.getByLabel('To date')).toBeVisible();
   await expect(page.getByLabel('Maximum amount')).toBeVisible();
+  await expect(page.getByLabel('Sort activity')).toBeVisible();
+  await expect(page.getByText('Completed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Reconciliation', { exact: true }).first()).toBeVisible();
+  await page.getByLabel('Sort activity').selectOption('oldest');
+  await expect(page.getByLabel('Sort activity')).toHaveValue('oldest');
   await page.getByRole('button', { name: 'Refunds' }).click();
   await expect(page.getByRole('main')).toContainText(/No activity yet|Refund/i);
 });
@@ -1446,11 +1460,14 @@ test('mini app activity opens transaction detail metadata', async ({ page }) => 
   await mockTransferlyApi(page);
   await page.goto('/miniapp/activity');
 
-  const timeline = page.locator('main').getByRole('button').filter({ hasText: /Invoice|Payout|Top-up|Receipt/ }).first();
+  const timeline = page.locator('main').getByRole('button', { name: /^Invoice / }).first();
   await timeline.click();
   await expect(page.getByRole('region', { name: 'Transaction detail' })).toBeVisible();
   await expect(page.getByText('Transferly transaction ID')).toBeVisible();
-  await expect(page.getByText('Reconciliation')).toBeVisible();
+  await expect(page.getByText(/No unresolved reconciliation signal|Reconciliation required/)).toBeVisible();
+  await page.getByRole('link', { name: 'Report an issue' }).click();
+  await expect(page).toHaveURL(/\/miniapp\/support\?from=activity/);
+  await expect(page.getByText('Reported transaction:')).toBeVisible();
 });
 
 test('mini app services exposes normalized discovery filters', async ({ page }) => {
@@ -1587,7 +1604,7 @@ test('legacy PayPal replica routes fail closed into the provider workspace', asy
 
   await expect(page).toHaveURL(/\/miniapp\/services\/paypal\/settings$/);
   await expectProviderWorkspace(page, 'PayPal');
-  await expect(page.locator('section').filter({ hasText: 'Environment, webhook readiness, supported operations, and support resources.' }).getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true }).first()).toBeVisible();
 });
 
 test('mini app service detail handles missing service slugs', async ({ page }) => {
@@ -2359,6 +2376,11 @@ test('mini app support desk renders attached handoff context', async ({ page }) 
   await expect(page.getByText('Screen: wallet')).toBeVisible();
   await expect(page.getByText('Transferly user: admin@transferly.test')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Copy support context' })).toBeVisible();
+  await expect(page.getByLabel('Support issue category')).toHaveValue('transaction review');
+  await page.getByLabel('Support issue category').selectOption('bug report');
+  await page.getByLabel('Support issue details').fill('The activity detail needs a follow-up.');
+  await expect(page.getByText('Issue category: bug report')).toBeVisible();
+  await expect(page.getByText('Issue details: The activity detail needs a follow-up.')).toBeVisible();
 });
 
 test('mini app exposes Telegram settings and saves local preferences', async ({ page }) => {
@@ -2436,6 +2458,12 @@ test('mini app exposes Telegram settings and saves local preferences', async ({ 
   await hapticsSwitch.click();
   await expect(hapticsSwitch).toHaveAttribute('aria-checked', 'false');
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_miniapp_haptics_enabled'))).toBe('false');
+
+  const fundingSwitch = page.getByRole('switch', { name: /Funding and points/ });
+  await expect(fundingSwitch).toHaveAttribute('aria-checked', 'true');
+  await fundingSwitch.click();
+  await expect(fundingSwitch).toHaveAttribute('aria-checked', 'false');
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem('transferly_miniapp_notification_preferences')).funding)).toBe(false);
 
   await page.locator('section').filter({ hasText: 'Default screen' }).getByRole('button', { name: 'Wallet' }).click();
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('transferly_miniapp_default_screen'))).toBe('wallet');
@@ -2667,7 +2695,7 @@ test('provider-first routes and legacy redirects land in provider workspaces', a
 
   await page.goto('/services/paypal?view=invoices&status=sent');
   await expect(page).toHaveURL(/\/miniapp\/services\/paypal\/invoices\?status=sent$/);
-  await expect(page.locator('section').filter({ hasText: 'PayPal invoice collection, hosted payment link access, reminders, QR generation, and status refresh.' }).getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('section').filter({ hasText: 'Collections for provider-backed invoices, hosted payment links, reminders, QR generation, and status refresh.' }).getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible({ timeout: 10000 });
 
   await page.goto('/miniapp/services/paypal/payouts');
   await expect(page).toHaveURL(/\/miniapp\/services\/paypal\/payouts$/);
@@ -2716,6 +2744,18 @@ test('PayPal provider workspace remains usable on mobile', async ({ page }) => {
   await expectNoHorizontalOverflow(page);
 });
 
+test('PayPal collections exposes the payment-link simulator boundary', async ({ page }) => {
+  await primeMiniAppUi(page);
+  await mockTransferlyApi(page);
+
+  await page.goto('/miniapp/services/paypal/invoices');
+
+  await expect(page.getByRole('heading', { name: 'Payment Links & Buttons', exact: true })).toBeVisible();
+  await expect(page.getByText('Use hosted links generated from Transferly invoice records. This simulator never creates an official PayPal-branded checkout page.')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open invoice builder/i })).toHaveAttribute('href', /\/miniapp\/services\/paypal\/invoices$/);
+  await expect(page.getByText('Transferly’s internal ledger remains authoritative.')).toBeVisible();
+});
+
 test('PayPal console overview uses hosted-console sections and copy', async ({ page }) => {
   await primeMiniAppUi(page);
   await mockTransferlyApi(page);
@@ -2723,8 +2763,9 @@ test('PayPal console overview uses hosted-console sections and copy', async ({ p
   await page.goto('/miniapp/services/paypal/overview');
 
   await expect(page.locator('section').filter({ hasText: 'Environment, webhook readiness, supported operations, and support resources.' }).getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByText('Hosted PayPal workspace inside Transferly')).toBeVisible();
-  await expect(page.getByText('Invoices, payouts, transactions, webhooks, and readiness in one view')).toBeVisible();
+  await expect(page.getByText('PayPal-compatible workflows inside Transferly')).toBeVisible();
+  await expect(page.getByText('Synthetic test data only. No live PayPal account, credentials, or funds are accessed from this simulator.')).toBeVisible();
+  await expect(page.getByText('Business tools')).toBeVisible();
   await expect(page.getByText('Create, send, refresh, and track hosted PayPal invoices.')).toBeVisible();
   await expect(page.getByText('Submit payout batches, track status, and review payout readiness.')).toBeVisible();
   const quickActions = page.locator('#paypal-quick-actions');
@@ -2732,7 +2773,7 @@ test('PayPal console overview uses hosted-console sections and copy', async ({ p
   await expect(quickActions.getByRole('link', { name: /Request Payout/i })).toBeVisible();
   await quickActions.getByRole('button', { name: /Send Reminder/i }).click();
   await expect(page.getByRole('dialog', { name: 'Send PayPal invoice reminder?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.getByText('The hosted invoice link comes from PayPal’s invoice resource.')).toBeVisible();
   await expect(page.getByText('Webhook signatures must be verified before any state mutation.')).toBeVisible();
   await expect(page.getByText('Transferly ledger remains the source of truth for internal balances.')).toBeVisible();
@@ -2771,7 +2812,7 @@ test('legacy PayPal invoice launcher opens the PayPal provider invoice lane', as
   await page.goto('/services/paypal?view=invoices');
 
   await expect(page).toHaveURL(/\/miniapp\/services\/paypal\/invoices/);
-  await expect(page.locator('section').filter({ hasText: 'PayPal invoice collection, hosted payment link access, reminders, QR generation, and status refresh.' }).getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('section').filter({ hasText: 'Collections for provider-backed invoices, hosted payment links, reminders, QR generation, and status refresh.' }).getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible({ timeout: 10000 });
   await expect(page.getByText('Available invoice actions')).toBeVisible();
   await expect(page.getByText('INV-1001', { exact: true })).toBeVisible();
 });

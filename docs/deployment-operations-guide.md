@@ -28,6 +28,20 @@
 - [ ] GDPR/compliance requirements met
 - [ ] Legal review completed
 
+### Required evidence commands
+
+Run from the repository root and retain the command output with the release record:
+
+```bash
+npm run verify:release
+NODE_ENV=production npm run check:production
+STAGING_STRICT=true npm run verify:staging
+npm run check:miniapp:bundle
+npm run scan:secrets
+```
+
+The release record must include the commit SHA, deployment target, test totals, migration status, backup evidence path, bundle results, environment validation status, provider webhook and credential status, queue health, reconciliation summary, approver, and rollback owner. Never include secret values, bearer tokens, webhook headers, or raw provider payloads.
+
 ## 2. Deployment Procedures
 
 ### Staging Deployment
@@ -119,6 +133,16 @@ aws s3 cp backup-latest.db s3://transferly-backups/
 sqlite3 backup-latest.db ".schema" | sqlite3 test-recovery.db
 ```
 
+The supported verification path records a checksum and marks the evidence manifest with `operation: "backup"`:
+
+```bash
+npm run backup --prefix api
+npm run backup:verify --prefix api
+npm run backup:prune --prefix api
+```
+
+Do not treat a copied SQLite file as restore evidence until `backup:verify` passes. Preserve failed artifacts for incident review and block promotion until the cause is resolved.
+
 ### RTO/RPO Targets
 - **RTO** (Recovery Time Objective): 1 hour
 - **RPO** (Recovery Point Objective): 15 minutes
@@ -145,6 +169,20 @@ EXPLAIN QUERY PLAN SELECT ...
 - Code split by route
 - Lazy load non-critical components
 - Use service workers for offline support
+- Keep activity timelines bounded through pagination.
+- Confirm safe-read deduplication is limited to `GET` and `HEAD`; never deduplicate mutations.
+- Record bundle-budget output and investigate Core Web Vitals in a production-like browser session.
+
+## 6.1 Financial state handling
+
+Operational dashboards and support responses must distinguish:
+
+- `PENDING` or `PROCESSING`: work is still in progress;
+- `FAILED`, `CANCELLED`, or `REJECTED`: the operation did not complete;
+- `UNKNOWN`, `RECONCILING`, or `RECONCILIATION_REQUIRED`: provider and ledger evidence need investigation;
+- `COMPLETED` or `PAID`: only when the authoritative internal state confirms completion.
+
+Never infer successful payment from a provider response alone. Use the internal ledger, persisted event history, and reconciliation result.
 
 ## 7. Scheduled Maintenance
 

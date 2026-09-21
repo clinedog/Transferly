@@ -4604,6 +4604,7 @@ describe('API integration flows', () => {
 
     assert.equal(pointsResponse.status, 200);
     assert.equal(pointsResponse.json().points, 50);
+    await setPointBalance(authBody.user.id, 250);
 
     const receiptPayload = JSON.stringify({
       serviceSlug: 'faker-data',
@@ -4627,7 +4628,7 @@ describe('API integration flows', () => {
     assert.ok(receiptBody.receipt.id);
     assert.match(receiptBody.pdf_data_url, /^data:application\/pdf;base64,/);
     assert.match(receiptBody.image_data_url, /^data:image\/svg\+xml;base64,/);
-    assert.equal(receiptBody.summary.remaining_points, 40);
+    assert.equal(receiptBody.summary.remaining_points, 0);
     assert.deepEqual(receiptBody.safety, {
       mode: 'sandbox',
       required_markings: SANDBOX_REQUIRED_MARKINGS
@@ -4646,9 +4647,9 @@ describe('API integration flows', () => {
     );
     assert.equal(pointReservations.length, 1);
     assert.equal(pointReservations[0].status, 'COMMITTED');
-    assert.equal(pointReservations[0].amount, 10);
-    assert.equal(pointReservations[0].available_points_before, 50);
-    assert.equal(pointReservations[0].available_points_after, 40);
+    assert.equal(pointReservations[0].amount, 250);
+    assert.equal(pointReservations[0].available_points_before, 250);
+    assert.equal(pointReservations[0].available_points_after, 0);
     assert.ok(pointReservations[0].committed_at);
 
     const receiptPointEntries = await db.all(
@@ -4656,7 +4657,7 @@ describe('API integration flows', () => {
       ['RECEIPT', receiptBody.receipt.id]
     );
     assert.equal(receiptPointEntries.length, 2);
-    assert.deepEqual(receiptPointEntries.map((entry) => entry.amount), [-10, 0]);
+    assert.deepEqual(receiptPointEntries.map((entry) => entry.amount), [-250, 0]);
     assert.equal(receiptPointEntries[0].type, 'RECEIPT_SPEND');
     assert.equal(receiptPointEntries[1].type, 'POINT_RESERVATION_COMMIT');
     assert.equal(receiptPointEntries[0].entry_key, `point-reservation:${pointReservations[0].id}:hold`);
@@ -4678,7 +4679,7 @@ describe('API integration flows', () => {
 
     assert.equal(blockedReceiptResponse.status, 410);
     assert.equal(blockedReceiptResponse.json().code, 'LEGACY_RECEIPT_GENERATION_DISABLED');
-    assert.equal(await pointLedgerService.getBalance(authBody.user.id), 40);
+    assert.equal(await pointLedgerService.getBalance(authBody.user.id), 0);
     assert.equal(
       (await db.get('SELECT COUNT(*) AS count FROM receipts WHERE user_id = ?', [authBody.user.id])).count,
       1
@@ -4750,7 +4751,7 @@ describe('API integration flows', () => {
     assert.equal(telegramResponse.status, 200);
     const telegramBody = telegramResponse.json();
     assert.equal(telegramBody.command, '/balance');
-    assert.equal(telegramBody.response.data.points, 40);
+    assert.equal(telegramBody.response.data.points, 0);
 
     const telegramProfilePayload = JSON.stringify({
       update_id: 5,
@@ -4778,7 +4779,7 @@ describe('API integration flows', () => {
     });
 
     assert.equal(telegramProfileResponse.status, 200);
-    assert.equal(telegramProfileResponse.json().response.data.points, 40);
+    assert.equal(telegramProfileResponse.json().response.data.points, 0);
 
     await db.run('UPDATE profiles SET points = points + 1 WHERE user_id = ?', [authBody.user.id]);
     try {
@@ -4896,7 +4897,7 @@ describe('API integration flows', () => {
     assert.equal(receipt.status, 'EMAILED');
 
     const profile = await profileRepository.findByUserId(authBody.user.id);
-    assert.equal(profile.points, 40);
+    assert.equal(profile.points, 0);
   });
 
   test('POST /api/auth/telegram-mini-app validates Telegram init data and issues a user token', async () => {

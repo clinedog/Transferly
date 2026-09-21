@@ -30,10 +30,13 @@ export default function PayPalOverview({ manifest, dashboard, snapshot, loading,
     >
       <section className="space-y-4">
         <div className="rounded-[28px] border border-[#0070e0]/25 bg-[#0070e0]/10 p-4">
-          <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0070e0] px-3 py-1 text-xs font-black text-white">{environment}</span></div>
-          <h2 className="mt-3 text-2xl font-black text-[var(--miniapp-text-primary)]">PayPal Console</h2>
-          <p className="mt-1 text-sm font-bold text-[var(--miniapp-text-muted)]">Hosted PayPal workspace inside Transferly</p>
-          <p className="mt-2 text-xs font-black text-[#0070e0]">Invoices, payouts, transactions, webhooks, and readiness in one view</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#0070e0] px-3 py-1 text-xs font-black text-white">{environment}</span>
+            <span className="rounded-full border border-[#0070e0]/25 px-3 py-1 text-xs font-black text-[#0070e0]">Transferly Sandbox Simulator</span>
+          </div>
+          <h2 className="mt-3 text-2xl font-black text-[var(--miniapp-text-primary)]">Sandbox provider console</h2>
+          <p className="mt-1 text-sm font-bold text-[var(--miniapp-text-muted)]">PayPal-compatible workflows inside Transferly</p>
+          <p className="mt-2 text-xs font-black text-[#0070e0]">Synthetic test data only. No live PayPal account, credentials, or funds are accessed from this simulator.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map(([title, copy, secondary, Icon]) => (

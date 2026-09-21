@@ -179,14 +179,14 @@ Apply these at all times — not only during explicit security reviews:
 <!-- BUS:START -->
 ## 🔴 LIVE BOARD — read this before you touch anything
 
-_Generated 2026-09-20T13:01Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
+_Generated 2026-09-21T08:31Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
 
 **⚠️ 2 WARNING(S) — your next run may be affected:**
 - `emu37qfu6iap8` **copilot**: User operations now prompts for reason and confirmation before points adjustments and loads authoritative finance profiles; no general audit-log API exists, so no synthetic audit UI was added.
 - `emu3ej6oljlud` **copilot**: Failure-injection test exposed and fixed classification ordering bug: PROVIDER_TIMEOUT now maps to timeout instead of generic provider failure, preserving retry semantics.
 
-**📌 CLAIMED RIGHT NOW (1) — do NOT edit these paths:**
-- **Transferly**: miniapp/**, api/**, docs/mini.md, path:docs/codex — expires 14:55Z — Starting execution of all remaining phases in mini.md (Phases 15-28): design system, responsive UX, performance, observability, security, operations, testing, documentation. Will proceed incrementally with evidence-driven verification at each phase.
+**📌 CLAIMED RIGHT NOW (0) — do NOT edit these paths:**
+- _(nobody is working)_
 
 Full board: use the `trc_team_read` tool, or run `agent-bus.mjs read --agent <you>`.
 <!-- BUS:END -->

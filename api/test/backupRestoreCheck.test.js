@@ -62,6 +62,22 @@ test('verification rejects a tampered backup evidence manifest', async () => {
   }
 });
 
+test('verification rejects evidence that is not marked as a backup', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'transferly-backup-operation-'));
+  const source = path.join(directory, 'source.sqlite');
+  const destination = path.join(directory, 'backup.sqlite');
+  try {
+    await createDatabase(source);
+    const backup = await backupDatabase(source, destination);
+    const manifest = JSON.parse(fs.readFileSync(backup.evidencePath, 'utf8'));
+    delete manifest.operation;
+    fs.writeFileSync(backup.evidencePath, `${JSON.stringify(manifest)}\n`);
+    await assert.rejects(() => verifyDatabase(destination), /does not match/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('retention pruning removes only older manifest-backed backups', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'transferly-backup-retention-'));
   try {
