@@ -22,6 +22,8 @@ import {
   Zap
 } from 'lucide-react';
 import PaymentsTab from './AdminTabs/PaymentsTab';
+import { AdminPayoutsTab } from './AdminTabs/AdminPayoutsTab';
+import { AdminDeveloperTab } from './AdminTabs/AdminWebhooksTab';
 import ProviderWorkspaceShell from './ProviderWorkspaceShell';
 import toast from 'react-hot-toast';
 import {
@@ -1112,16 +1114,9 @@ function PayPalPayoutLane({ readiness }) {
         body="PayPal payout batch creation, preview, retry-safe submission, batch tracking, and status review."
       />
       <ReadinessPanel readiness={readiness} />
-      <CapabilityList
-        title="Available payout actions"
-        items={['Request Payout', 'Preview Payout', 'Refresh Payout', 'Copy Batch ID', 'View Tracking']}
-      />
-      <HelperList items={[
-        'Safe retries reuse the same batch identifier.',
-        'Payout state is mapped into Transferly’s internal payout lifecycle.',
-        'Batch tracking helps you compare provider status with internal records.'
-      ]} />
-      <PaymentsTab embedded mode="payout" providerFilter="paypal" />
+      <section className="rounded-lg overflow-hidden border border-slate-200 bg-white" style={{ minHeight: '600px' }}>
+        <AdminPayoutsTab />
+      </section>
     </div>
   );
 }
@@ -1482,83 +1477,18 @@ function PayPalWorkspaceQuickNav({ activeLane }) {
   );
 }
 
-function PayPalWebhookLane({ payload, readiness }) {
-  const data = readResourceData(payload);
-  const records = data.records || [];
-  const eventGroups = data.event_groups || [];
-
+function PayPalWebhookLane({ readiness }) {
   return (
     <div className="space-y-4">
       <LaneHeader
         eyebrow="PayPal Webhooks Management API"
         title="Webhooks"
         body="Signature verification readiness, delivery history, and event processing posture."
-        action={(
-          <Link
-            to="/miniapp/ops?provider=paypal"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-black text-[var(--tg-text-color)] transition hover:bg-white/[0.08]"
-          >
-            Command center
-            <ArrowRight size={15} />
-          </Link>
-        )}
       />
       <ReadinessPanel readiness={readiness} />
-      <section className="grid gap-3 sm:grid-cols-3">
-        <MetricCard icon={CheckCircle2} label="Webhook Status" value={data.configured_webhook_id_present ? 'Configured' : 'Missing'} detail="Webhook ID value is never exposed." tone={data.configured_webhook_id_present ? 'default' : 'warning'} />
-        <MetricCard icon={ShieldCheck} label="Signature Verified" value={humanizeStatus(data.signature_verification_status)} detail="Status only; no headers or raw payloads." />
-        <MetricCard icon={AlertTriangle} label="Failed Deliveries" value={data.failed_attempts || 0} detail="Review failures through command center." tone={data.failed_attempts ? 'warning' : 'default'} />
+      <section className="rounded-lg overflow-hidden border border-slate-200 bg-white" style={{ minHeight: '600px' }}>
+        <AdminDeveloperTab />
       </section>
-      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DataField label="Delivery Health" value={data.endpoint_status || readiness?.status} />
-        <DataField label="Recent Events" value={records.length} />
-        <DataField label="Last Webhook At" value={data.last_successful_webhook_at} />
-        <DataField label="Dead Letter State" value={data.failed_attempts ? 'Needs Review' : 'Clear'} />
-        <DataField label="Linked Records" value="Sanitized form only" />
-      </dl>
-      <HelperList items={[
-        'Webhook signatures must be verified before any state mutation.',
-        'Delivery history helps confirm whether provider events reached Transferly.',
-        'Recent events are displayed in sanitized form only.'
-      ]} />
-      <RecordList
-        title="Event health by type"
-        records={eventGroups}
-        emptyTitle="No webhook groups yet"
-        emptyBody="Webhook event health will be grouped by event type once PayPal deliveries arrive."
-        renderRecord={(group) => (
-          <article key={group.event_type} className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill status={group.failed ? 'needs-review' : 'healthy'} />
-              <span className="text-xs font-bold text-[var(--tg-subtitle-text-color)]">{group.count || 0} deliveries</span>
-            </div>
-            <p className="mt-2 font-black text-[var(--tg-text-color)]">{group.event_type}</p>
-            <dl className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <DataField label="Processed" value={group.processed || 0} />
-              <DataField label="Failed" value={group.failed || 0} />
-              <DataField label="First Seen" value={formatDateTime(group.first_seen_at)} />
-              <DataField label="Last Seen" value={formatDateTime(group.last_seen_at)} />
-              <DataField label="Linked Records" value={(group.linked_records || []).join(', ') || 'not linked yet'} />
-            </dl>
-          </article>
-        )}
-      />
-      <RecordList
-        title="Recent Events"
-        records={records}
-        emptyTitle="No webhook events yet"
-        emptyBody="PayPal webhook deliveries will appear here once activity begins."
-        renderRecord={(event) => (
-          <article key={event.event_id || event.id || event.type} className="rounded-2xl border border-white/10 bg-white/[0.045] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill status={event.status || 'recorded'} />
-              <span className="text-xs font-bold text-[var(--tg-subtitle-text-color)]">{formatDateTime(event.received_at || event.processed_at)}</span>
-            </div>
-            <p className="mt-2 font-black text-[var(--tg-text-color)]">{event.event_type || 'PayPal webhook event'}</p>
-            <p className="mt-1 text-xs font-bold text-[var(--tg-subtitle-text-color)]">Linked resource: {event.linked_resource || 'not linked yet'}</p>
-          </article>
-        )}
-      />
     </div>
   );
 }
