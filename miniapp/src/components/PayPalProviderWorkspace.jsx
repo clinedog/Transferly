@@ -1498,6 +1498,8 @@ function PayPalDisputesLane({ payload, readiness }) {
   const detail = data.detail || {};
   const records = data.records || [];
   const actionGates = detail.action_gates || [];
+  const totalAmountAtRisk = records.reduce((total, record) => total + Number(record.amount_at_risk || 0), 0);
+  const evidenceDueSoon = records.filter((record) => record.evidence_deadline).length;
 
   return (
     <div className="space-y-4">
@@ -1509,8 +1511,16 @@ function PayPalDisputesLane({ payload, readiness }) {
       <ReadinessPanel readiness={readiness} />
       <section className="grid gap-3 sm:grid-cols-3">
         <MetricCard icon={ShieldCheck} label="Mode" value={detail.read_only === false ? 'Actions Enabled' : 'Read Only'} detail="Dispute actions stay gated until policy, evidence, and audit flows are complete." />
-        <MetricCard icon={AlertTriangle} label="Amount at Risk" value={detail.amount_at_risk || 'Pending'} detail="Shown after the disputes read model is connected." tone="warning" />
-        <MetricCard icon={Clock3} label="Evidence Deadline" value={detail.evidence_deadline || 'Pending'} detail="Deadline tracking appears with provider dispute records." />
+        <MetricCard icon={AlertTriangle} label="Amount at Risk" value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalAmountAtRisk / 100)} detail="Shown after the disputes read model is connected." tone="warning" />
+        <MetricCard icon={Clock3} label="Evidence Deadline" value={evidenceDueSoon ? `${evidenceDueSoon} due` : 'Pending'} detail="Deadline tracking appears with provider dispute records." />
+      </section>
+      <section className="rounded-[28px] border border-white/10 bg-[var(--tg-section-bg-color)] p-4">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--tg-hint-color)]">Transferly dispute safeguards</p>
+        <ul className="mt-3 space-y-2 text-sm font-bold text-[var(--tg-text-color)]">
+          <li className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2">Case actions remain disabled unless a verified evidence workflow exists.</li>
+          <li className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2">Amount-at-risk is display-only and remains subordinate to the ledger and approval state.</li>
+          <li className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2">Operator notes and deadlines are preserved as audit metadata instead of account-level credentials.</li>
+        </ul>
       </section>
       <CapabilityList title="Action gates" items={actionGates.map(formatActionLabel)} />
       <CapabilityList title="Read model columns" items={detail.table_columns || []} />
@@ -1553,28 +1563,34 @@ function PayPalSettingsLane({ payload, readiness }) {
   return (
     <div className="space-y-4">
       <LaneHeader
-        eyebrow="PayPal settings"
+        eyebrow="Transferly settings"
         title="Settings"
-        body="Environment, webhook readiness, supported operations, and support resources."
+        body="Transferly-owned configuration, operator readiness, and sanitized provider setup context."
       />
       <ReadinessPanel readiness={readiness} />
       <section className="grid gap-3 sm:grid-cols-3">
-        <MetricCard icon={Gauge} label="Environment Mode" value={data.environment_mode || 'not configured'} detail="Sandbox records are labeled by the API." />
+        <MetricCard icon={Gauge} label="Environment Mode" value={data.environment_mode || 'sandbox'} detail="Sandbox and live state are labeled by environment, not by pretending to be a PayPal account UI." />
         <MetricCard icon={ShieldCheck} label="Webhook Endpoint" value={humanizeStatus(data.webhook_endpoint_status)} detail="Endpoint readiness only; no secrets exposed." />
         <MetricCard icon={CheckCircle2} label="Supported Currencies" value={(data.supported_currencies || []).length} detail={(data.supported_currencies || []).join(', ') || 'No currency list available.'} />
+      </section>
+      <section className="rounded-[28px] border border-emerald-400/20 bg-emerald-400/10 p-4">
+        <p className="text-sm font-black text-emerald-50">Transferly-owned config only</p>
+        <p className="mt-2 text-sm font-semibold leading-6 text-emerald-50">
+          This lane exposes Transferly control surfaces, readiness checks, and provider compatibility details. It does not impersonate PayPal account settings or expose credentials.
+        </p>
       </section>
       <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <DataField label="Provider Status" value={payload?.status || readiness?.status} />
         <DataField label="Webhook Secret" value={data.webhook_secret_status || 'not-exposed'} />
         <DataField label="Enabled Actions" value={(data.enabled_actions || []).slice(0, 6).join(', ')} />
-        <DataField label="Docs" value="PayPal docs linked below" />
-        <DataField label="Support" value="PayPal support resources" />
+        <DataField label="Docs" value="Transferly docs + provider references" />
+        <DataField label="Support" value="Transferly support desk" />
         <DataField label="Secret Values Exposed" value={String(Boolean(data.secret_values_exposed))} />
       </dl>
       <HelperList items={[
         'Show only sanitized readiness data in the UI.',
-        'Do not expose secret values in the workspace.',
-        'Use this section to verify setup before using hosted PayPal actions.'
+        'Never expose secret values in the workspace.',
+        'Use this section to verify provider compatibility without simulating PayPal admin settings.'
       ]} />
       <CapabilityList title="Enabled Actions" items={data.enabled_actions || []} />
       <RecordList
