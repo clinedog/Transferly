@@ -2649,6 +2649,13 @@ test('admin transaction center loads ledger and exception records', async ({ pag
   await expect(page.getByRole('combobox').locator('option[value="ledger"]')).toHaveCount(1);
   await expect(page.getByRole('combobox').locator('option[value="issue"]')).toHaveCount(1);
   await expect(page.getByText('Records', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export CSV' })).toBeEnabled();
+  await expect(page.getByText(/^Updated \d/)).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^transferly-transaction-center-\d{4}-\d{2}-\d{2}\.csv$/);
 });
 
 test('admin audit log shows immutable events without sensitive metadata', async ({ page }) => {

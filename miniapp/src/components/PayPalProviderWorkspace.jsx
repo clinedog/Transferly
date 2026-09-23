@@ -1093,6 +1093,7 @@ function PayPalInvoiceLane({ readiness }) {
       <HelperList items={[
         'This opens the official hosted PayPal invoice page.',
         'The recipient payment link comes from PayPal’s invoice resource.',
+        'Due dates and provider status determine whether a hosted link remains available.',
         'Use refresh to pull the latest invoice state from PayPal.',
         'Reminder actions follow PayPal invoice reminder workflows.',
         'QR generation is provided for mobile-friendly payment access.'

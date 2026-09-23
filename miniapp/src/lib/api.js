@@ -1185,9 +1185,14 @@ export function listInvoices(params = {}) {
 }
 
 export function createInvoice(payload) {
+  const { idempotencyKey, ...body } = payload || {};
+
   return apiRequest('/api/invoices', {
     method: 'POST',
-    body: payload
+    headers: {
+      'Idempotency-Key': idempotencyKey || createIdempotencyKey('invoice')
+    },
+    body
   });
 }
 

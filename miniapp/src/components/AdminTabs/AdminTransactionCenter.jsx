@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, RefreshCw, Search, ShieldAlert, WalletCards } from 'lucide-react';
+import { AlertTriangle, Download, RefreshCw, Search, ShieldAlert, WalletCards } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   listAdminFinanceReconciliationAlerts,
@@ -22,6 +22,27 @@ const statusTone = {
 
 function label(value) {
   return String(value || 'UNKNOWN').replaceAll('_', ' ');
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`;
+}
+
+function downloadTransactionExport(records) {
+  const columns = ['kind', 'id', 'reference_id', 'provider_reference', 'type', 'status', 'provider', 'amount_minor', 'points'];
+  const rows = [
+    columns,
+    ...records.map((item) => columns.map((column) => item[column] ?? ''))
+  ].map((row) => row.map(csvCell).join(','));
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `transferly-transaction-center-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 function TransactionCard({ item }) {
@@ -56,6 +77,7 @@ export default function AdminTransactionCenter() {
   const [filter, setFilter] = useState('all');
   const [records, setRecords] = useState([]);
   const [warning, setWarning] = useState('');
+  const [lastLoadedAt, setLastLoadedAt] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -75,6 +97,7 @@ export default function AdminTransactionCenter() {
         ...(reconciliation.data || []).map((item) => ({ ...item, kind: 'reconciliation' })),
         ...(issues.data || []).map((item) => ({ ...item, kind: 'issue' }))
       ]);
+      setLastLoadedAt(new Date());
     } catch (error) {
       toast.error(error.message || 'Transaction center could not be loaded.');
       setWarning('Transaction data could not be loaded.');
@@ -102,7 +125,11 @@ export default function AdminTransactionCenter() {
           <h2 className="mt-2 text-3xl font-black tracking-tight text-[var(--miniapp-text-primary)]">Transaction center</h2>
           <p className="mt-1 max-w-3xl text-sm font-semibold text-[var(--miniapp-text-secondary)]">Search ledger activity and exception records without exposing provider credentials or payment secrets.</p>
         </div>
-        <button type="button" onClick={load} disabled={loading} className="miniapp-pressable miniapp-touch-target inline-flex items-center justify-center gap-2 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-accent-border)] bg-[var(--miniapp-accent-soft)] px-4 text-sm font-black text-[var(--miniapp-accent-cyan)] disabled:opacity-50"><RefreshCw size={16} className={loading ? 'motion-safe:animate-spin' : ''} /> Refresh</button>
+        <div className="flex flex-wrap items-center gap-2">
+          {lastLoadedAt ? <p className="text-xs font-bold text-[var(--miniapp-text-muted)]">Updated {lastLoadedAt.toLocaleTimeString()}</p> : null}
+          <button type="button" onClick={() => downloadTransactionExport(filtered)} disabled={!filtered.length || loading} className="miniapp-pressable miniapp-touch-target inline-flex items-center justify-center gap-2 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-border)] px-4 text-sm font-black text-[var(--miniapp-text-primary)] disabled:opacity-50"><Download size={16} /> Export CSV</button>
+          <button type="button" onClick={load} disabled={loading} className="miniapp-pressable miniapp-touch-target inline-flex items-center justify-center gap-2 rounded-[var(--miniapp-radius-control)] border border-[var(--miniapp-accent-border)] bg-[var(--miniapp-accent-soft)] px-4 text-sm font-black text-[var(--miniapp-accent-cyan)] disabled:opacity-50"><RefreshCw size={16} className={loading ? 'motion-safe:animate-spin' : ''} /> Refresh</button>
+        </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-3">
@@ -126,6 +153,7 @@ export default function AdminTransactionCenter() {
         </div>
       </section>
       {warning ? <div role="alert" className="rounded-[var(--miniapp-radius-card)] border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-bold text-amber-100">{warning}</div> : null}
+      {exceptions ? <div role="status" className="rounded-[var(--miniapp-radius-card)] border border-rose-300/25 bg-rose-300/10 p-4 text-sm font-bold text-rose-100">Reconciliation is not complete for {exceptions.toLocaleString()} record{exceptions === 1 ? '' : 's'}. Review unmatched payments and provider issues before treating balances as settled.</div> : null}
 
       {loading ? <div className="miniapp-surface-card flex min-h-40 items-center justify-center p-6 text-sm font-bold text-[var(--miniapp-text-secondary)]" role="status" aria-live="polite">Loading transaction records…</div> : filtered.length ? <div className="grid gap-3 lg:grid-cols-2">{filtered.map((item, index) => <TransactionCard key={`${item.kind}-${item.id || index}`} item={item} />)}</div> : <div className="rounded-[var(--miniapp-radius-card)] border border-dashed border-[var(--miniapp-border)] p-12 text-center text-sm font-bold text-[var(--miniapp-text-secondary)]" role="status">No records match the selected filters.</div>}
     </div>
