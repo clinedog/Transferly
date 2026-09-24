@@ -119,7 +119,7 @@ function getStatusTone(value, fallback = 'default') {
 }
 
 function readableStatusLabel(status) {
-  const upper = String(status || 'PENDING').toUpperCase();
+  const upper = normalizeCanonicalStatus(status).toUpperCase();
 
   switch (upper) {
     case 'UNKNOWN':
