@@ -9,7 +9,16 @@ test('transaction activity repository includes invoice and payout sources with p
   let params;
   const records = await transactionActivityRepository.listForUser(
     'user-1',
-    { kind: 'payout', query: 'batch', status: 'PENDING', limit: 25 },
+    {
+      kind: 'payout',
+      query: 'batch',
+      status: 'PENDING',
+      provider: 'paypal',
+      currency: 'USD',
+      from: '2026-09-01T00:00:00.000Z',
+      to: '2026-09-30T23:59:59.999Z',
+      limit: 25
+    },
     {
       async all(sql, values) {
         query = sql;
@@ -36,6 +45,10 @@ test('transaction activity repository includes invoice and payout sources with p
   assert.equal(params[0], 'user-1');
   assert.equal(params[1], 'payout');
   assert.equal(params[2], 'PENDING');
+  assert.equal(params[3], 'paypal');
+  assert.equal(params[4], 'USD');
+  assert.equal(params[5], '2026-09-01T00:00:00.000Z');
+  assert.equal(params[6], '2026-09-30T23:59:59.999Z');
   assert.equal(records[0].reference, 'batch-1');
   assert.equal(records[0].providerReference, 'paypal-item-1');
   assert.equal(records[0].amountMinor, 12500);

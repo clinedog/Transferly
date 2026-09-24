@@ -221,6 +221,10 @@ function buildOpenApiDocument({ baseUrl } = {}) {
           { name: 'query', in: 'query', schema: { type: 'string', maxLength: 120 } },
           { name: 'kind', in: 'query', schema: { type: 'string', enum: ['funding', 'top_up', 'receipt', 'invoice', 'payout'] } },
           { name: 'status', in: 'query', schema: { type: 'string', maxLength: 80 } },
+          { name: 'provider', in: 'query', schema: { type: 'string', maxLength: 80 } },
+          { name: 'currency', in: 'query', schema: { type: 'string', maxLength: 12 } },
+          { name: 'from', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
           { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } }
         ],
         responses: { 200: { $ref: '#/components/responses/Collection' }, ...errorResponses() }

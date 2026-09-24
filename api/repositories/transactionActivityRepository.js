@@ -78,12 +78,25 @@ function mapRelatedTransaction(row) {
   };
 }
 
-async function listForUser(userId, { query = '', kind = '', status = '', limit = 50 } = {}, client = db) {
+async function listForUser(userId, {
+  query = '',
+  kind = '',
+  status = '',
+  provider = '',
+  currency = '',
+  from = '',
+  to = '',
+  limit = 50
+} = {}, client = db) {
   const normalizedQuery = String(query || '').trim().toLowerCase();
   const params = [userId];
   const clauses = ['user_id = ?'];
   if (kind) clauses.push('kind = ?'), params.push(kind);
   if (status) clauses.push('status = ?'), params.push(status);
+  if (provider) clauses.push('lower(provider) = lower(?)'), params.push(provider);
+  if (currency) clauses.push('upper(currency) = upper(?)'), params.push(currency);
+  if (from) clauses.push('created_at >= ?'), params.push(from);
+  if (to) clauses.push('created_at <= ?'), params.push(to);
   if (normalizedQuery) {
     clauses.push('(lower(id) LIKE ? OR lower(reference) LIKE ? OR lower(provider_reference) LIKE ? OR lower(provider) LIKE ? OR lower(operation) LIKE ?)');
     const value = `%${normalizedQuery}%`;

@@ -64,10 +64,35 @@ const supportTicketListQuerySchema = z.object({
 
 const transactionActivityQuerySchema = z.object({
   query: z.string().trim().max(120).optional().default(''),
-  kind: z.enum(['funding', 'top_up', 'receipt', 'invoice', 'payout']).optional().default(''),
+  kind: z.union([
+    z.enum(['funding', 'top_up', 'receipt', 'invoice', 'payout']),
+    z.literal('')
+  ]).default(''),
   status: z.string().trim().max(80).optional().default(''),
+  provider: z.string().trim().max(80).optional().default(''),
+  currency: z.string().trim().toUpperCase().max(12).optional().default(''),
+  from: z.string().trim().max(40).optional().default(''),
+  to: z.string().trim().max(40).optional().default(''),
   limit: z.coerce.number().int().positive().max(100).default(50)
-}).strict();
+}).strict().superRefine((value, context) => {
+  for (const field of ['from', 'to']) {
+    if (value[field] && Number.isNaN(Date.parse(value[field]))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field],
+        message: 'Expected a valid date or date-time'
+      });
+    }
+  }
+  if (value.from && value.to && !Number.isNaN(Date.parse(value.from)) && !Number.isNaN(Date.parse(value.to))
+    && Date.parse(value.from) > Date.parse(value.to)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['to'],
+      message: 'Must be on or after from'
+    });
+  }
+});
 
 const transactionActivityParamsSchema = z.object({
   id: z.string().trim().min(1).max(160)

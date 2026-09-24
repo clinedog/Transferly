@@ -1,8 +1,8 @@
 const { transactionActivityRepository } = require('../repositories/transactionActivityRepository');
 const { AppError } = require('../utils/errors');
 
-async function listUserActivity({ userId, query, kind, status, limit, repository = transactionActivityRepository }) {
-  return { data: await repository.listForUser(userId, { query, kind, status, limit }) };
+async function listUserActivity({ userId, query, kind, status, provider, currency, from, to, limit, repository = transactionActivityRepository }) {
+  return { data: await repository.listForUser(userId, { query, kind, status, provider, currency, from, to, limit }) };
 }
 
 async function getUserActivityDetail({ userId, activityId, repository = transactionActivityRepository }) {
