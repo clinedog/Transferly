@@ -27,6 +27,7 @@ const OUT_FILE = path.resolve(
 
 describe('generate-paypal-icons script', () => {
   const tempMirror = fs.mkdtempSync(path.join(os.tmpdir(), 'paypal-mirror-'));
+  const originalOutput = fs.existsSync(OUT_FILE) ? fs.readFileSync(OUT_FILE) : null;
 
   // Minimal mock SVG assets – naming chosen to test the component‑name conversion
   const svgA = `<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z"/></svg>`;
@@ -54,8 +55,14 @@ describe('generate-paypal-icons script', () => {
     assert.match(content, /export const Test1Icon/);
     assert.match(content, /export const Test2Icon/);
 
-    // Clean up temporary files and generated output
+    // Clean up temporary files and restore the tracked generated artifact.
     try { fs.rmSync(tempMirror, { recursive: true, force: true }); } catch (_) {}
-    try { fs.unlinkSync(OUT_FILE); } catch (_) {}
+    try {
+      if (originalOutput) {
+        fs.writeFileSync(OUT_FILE, originalOutput);
+      } else {
+        fs.unlinkSync(OUT_FILE);
+      }
+    } catch (_) {}
   });
 });
