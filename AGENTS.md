@@ -179,7 +179,7 @@ Apply these at all times — not only during explicit security reviews:
 <!-- BUS:START -->
 ## 🔴 LIVE BOARD — read this before you touch anything
 
-_Generated 2026-09-24T01:29Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
+_Generated 2026-09-24T01:43Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
 
 **⚠️ 2 WARNING(S) — your next run may be affected:**
 - `emu37qfu6iap8` **copilot**: User operations now prompts for reason and confirmation before points adjustments and loads authoritative finance profiles; no general audit-log API exists, so no synthetic audit UI was added.

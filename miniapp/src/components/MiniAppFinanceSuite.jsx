@@ -43,6 +43,7 @@ import {
   revokeMySession,
   rotateMyApiKey
 } from '../lib/api';
+import { normalizeStatus as normalizeCanonicalStatus } from '../lib/statusNormalization.js';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -109,7 +110,12 @@ function formatDate(value) {
 }
 
 function normalizeStatus(value) {
-  return String(value || 'pending').replace(/_/g, ' ').toLowerCase();
+  return normalizeCanonicalStatus(value).replace(/_/g, ' ');
+}
+
+function getStatusTone(value, fallback = 'default') {
+  const normalized = normalizeCanonicalStatus(value).toUpperCase();
+  return statusTone[normalized] || fallback;
 }
 
 function readableStatusLabel(status) {
@@ -256,7 +262,7 @@ function toneClass(tone = 'default') {
 
 function StatusBadge({ status }) {
   const upper = String(status || 'PENDING').toUpperCase();
-  const tone = statusTone[upper] || 'default';
+  const tone = getStatusTone(status, 'default');
 
   return (
     <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${toneClass(tone)}`}>
@@ -1581,7 +1587,7 @@ export function InvoicesSection() {
             events={[
               { icon: FileText, title: 'Invoice created', body: 'Ledger intent and invoice details were prepared.', time: formatDate(readInvoiceCreatedAt(selected)), tone: 'info' },
               { icon: Mail, title: 'Client delivery', body: 'Payment link is ready for client handoff and reminders.', time: 'live', tone: 'warn' },
-              { icon: BadgeCheck, title: 'Collection state', body: `${normalizeStatus(selected?.status)}. ${invoiceLifecycle(selected).next}`, time: 'now', tone: statusTone[String(selected?.status || '').toUpperCase()] || 'default' }
+              { icon: BadgeCheck, title: 'Collection state', body: `${normalizeStatus(selected?.status)}. ${invoiceLifecycle(selected).next}`, time: 'now', tone: getStatusTone(selected?.status) }
             ]}
           />
         </div>
@@ -1673,9 +1679,9 @@ export function PayoutsSection() {
               </>
             }
             events={[
-              { icon: ShieldCheck, title: 'Lifecycle state', body: `${normalizeStatus(payoutLifecycle(selected).status)}. ${payoutLifecycle(selected).next}`, time: formatDate(readPayoutUpdatedAt(selected)), tone: statusTone[payoutLifecycle(selected).status] || 'warn' },
+              { icon: ShieldCheck, title: 'Lifecycle state', body: `${normalizeStatus(payoutLifecycle(selected).status)}. ${payoutLifecycle(selected).next}`, time: formatDate(readPayoutUpdatedAt(selected)), tone: getStatusTone(payoutLifecycle(selected).status, 'warn') },
               { icon: Clock3, title: 'Retry safety', body: ['RECONCILIATION', 'UNKNOWN'].includes(payoutLifecycle(selected).status) ? 'Do not submit a duplicate retry until the provider outcome is reconciled.' : 'Idempotency protects repeated submissions for this request.', time: 'policy', tone: 'warn' },
-              { icon: WalletCards, title: 'Provider state', body: `Current payout state is ${normalizeStatus(selected?.status)}.`, time: formatDate(readPayoutUpdatedAt(selected)), tone: statusTone[String(selected?.status || '').toUpperCase()] || 'default' }
+              { icon: WalletCards, title: 'Provider state', body: `Current payout state is ${normalizeStatus(selected?.status)}.`, time: formatDate(readPayoutUpdatedAt(selected)), tone: getStatusTone(selected?.status) }
             ]}
           />
         </div>
@@ -1715,7 +1721,7 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       currency: readCurrency(invoice),
       amount: readAmount(invoice),
       icon: FileText,
-      tone: statusTone[String(invoice.status || '').toUpperCase()] || 'info',
+      tone: getStatusTone(invoice.status, 'info'),
       title: `Invoice ${normalizeStatus(invoice.status)}`,
       body: `${readInvoiceRecipient(invoice)} · ${formatMoney(readAmount(invoice), readCurrency(invoice))}`,
       time: formatDate(readInvoiceUpdatedAt(invoice)),
@@ -1730,7 +1736,7 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       currency: readCurrency(payout),
       amount: readAmount(payout),
       icon: WalletCards,
-      tone: statusTone[String(payout.status || '').toUpperCase()] || 'warn',
+      tone: getStatusTone(payout.status, 'warn'),
       title: `Payout ${normalizeStatus(payout.status)}`,
       body: `${readPayoutReceiver(payout)} · ${formatMoney(readAmount(payout), readCurrency(payout))}`,
       time: formatDate(readPayoutUpdatedAt(payout)),
@@ -1745,7 +1751,7 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
       currency: order.currency || 'NGN',
       amount: readAmount(order),
       icon: CreditCard,
-      tone: statusTone[String(order.status || '').toUpperCase()] || 'warn',
+      tone: getStatusTone(order.status, 'warn'),
       title: `Top-up ${normalizeStatus(order.status)}`,
       body: `${order.amount_label || `${Number(order.points || 0).toLocaleString()} pts`} · ${order.method_title || 'Funding'}`,
       time: formatDate(order.updated_at || order.created_at),
@@ -1819,7 +1825,7 @@ function buildAuthoritativeActivity(records = []) {
       currency,
       amount,
       icon: kind === 'funding' || kind === 'payout' ? WalletCards : kind === 'top_up' ? CreditCard : FileText,
-      tone: statusTone[status] || 'info',
+      tone: getStatusTone(status, 'info'),
       title: `${operation} ${normalizeStatus(status)}`,
       body: detail,
       time: formatDate(record?.createdAt),
@@ -2069,7 +2075,7 @@ export function ActivitySection() {
                     body: event.body || [event.source, event.providerReference].filter(Boolean).join(' · ') || 'Authoritative activity event',
                     time: formatDate(event.createdAt),
                     icon: Activity,
-                    tone: statusTone[String(event.status || '').toUpperCase()] || 'info'
+                    tone: getStatusTone(event.status, 'info')
                   }))} />
                 )}
               </SurfaceCard>
