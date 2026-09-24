@@ -11,6 +11,7 @@ const {
   updateCurrentUserProfileSchema,
   userPointsParamsSchema,
   supportTicketListQuerySchema,
+  transactionActivityParamsSchema,
   transactionActivityQuerySchema
 } = require('../schemas/slipcraftUserSchemas');
 const { slipcraftUserService } = require('../services/slipcraftUserService');
@@ -22,6 +23,14 @@ const { transactionActivityService } = require('../services/transactionActivityS
 async function listCurrentUserTransactionActivityController(request, response) {
   const query = transactionActivityQuerySchema.parse(request.query || {});
   response.json(await transactionActivityService.listUserActivity({ userId: request.auth.userId, ...query }));
+}
+
+async function getCurrentUserTransactionActivityController(request, response) {
+  const params = transactionActivityParamsSchema.parse(request.params || {});
+  response.json(await transactionActivityService.getUserActivityDetail({
+    userId: request.auth.userId,
+    activityId: params.id
+  }));
 }
 
 async function listCurrentUserSupportTicketsController(request, response) {
@@ -143,6 +152,7 @@ module.exports = {
   listCurrentUserFundingRequestsController,
   listCurrentUserSupportTicketsController,
   listCurrentUserTransactionActivityController,
+  getCurrentUserTransactionActivityController,
   listCurrentUserTopUpOrdersController,
   submitCurrentUserFundingEvidenceController,
   uploadCurrentUserFundingEvidenceController,

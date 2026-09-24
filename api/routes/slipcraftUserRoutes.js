@@ -11,6 +11,7 @@ const {
   listCurrentUserFundingRequestsController,
   listCurrentUserSupportTicketsController,
   listCurrentUserTransactionActivityController,
+  getCurrentUserTransactionActivityController,
   listCurrentUserTopUpOrdersController,
   submitCurrentUserFundingEvidenceController,
   uploadCurrentUserFundingEvidenceController,
@@ -43,6 +44,7 @@ router.get('/me/notification-preferences', requireAuthenticatedUser, asyncHandle
 router.patch('/me/notification-preferences', requireAuthenticatedUser, fundingRateLimiter, asyncHandler(updateCurrentUserNotificationPreferencesController));
 router.get('/me/support-tickets', requireAuthenticatedUser, asyncHandler(listCurrentUserSupportTicketsController));
 router.get('/me/transaction-activity', requireAuthenticatedUser, asyncHandler(listCurrentUserTransactionActivityController));
+router.get('/me/transaction-activity/:id', requireAuthenticatedUser, asyncHandler(getCurrentUserTransactionActivityController));
 router.post('/me/support-tickets', requireAuthenticatedUser, fundingRateLimiter, asyncHandler(createCurrentUserSupportTicketController));
 router.get('/me/top-up-orders', requireAuthenticatedUser, asyncHandler(listCurrentUserTopUpOrdersController));
 router.post('/me/top-up-orders', requireAuthenticatedUser, fundingRateLimiter, requireIdempotencyKey, asyncHandler(createCurrentUserTopUpOrderController));

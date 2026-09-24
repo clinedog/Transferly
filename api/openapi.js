@@ -219,11 +219,20 @@ function buildOpenApiDocument({ baseUrl } = {}) {
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'query', in: 'query', schema: { type: 'string', maxLength: 120 } },
-          { name: 'kind', in: 'query', schema: { type: 'string', enum: ['funding', 'top_up', 'receipt'] } },
+          { name: 'kind', in: 'query', schema: { type: 'string', enum: ['funding', 'top_up', 'receipt', 'invoice', 'payout'] } },
           { name: 'status', in: 'query', schema: { type: 'string', maxLength: 80 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } }
         ],
         responses: { 200: { $ref: '#/components/responses/Collection' }, ...errorResponses() }
+      }
+    },
+    '/api/v1/me/transaction-activity/{id}': {
+      get: {
+        tags: ['Transactions'],
+        summary: 'Get authenticated user transaction activity detail',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { $ref: '#/components/responses/Resource' }, ...errorResponses() }
       }
     },
     '/api/v1/me/organizations': {

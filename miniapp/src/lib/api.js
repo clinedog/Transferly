@@ -675,6 +675,10 @@ export function listTransactionActivity(params = {}) {
   return apiRequest(`/api/user/me/transaction-activity${buildQuery(params)}`);
 }
 
+export function getTransactionActivityDetail(activityId) {
+  return apiRequest(`/api/user/me/transaction-activity/${encodeURIComponent(activityId)}`);
+}
+
 export function markNotificationRead(notificationId) {
   return apiRequest(`/api/user/me/notifications/${encodeURIComponent(notificationId)}/read`, {
     method: 'POST',

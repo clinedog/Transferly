@@ -1803,19 +1803,29 @@ function buildAuthoritativeActivity(records = []) {
       : `${formatMoney(amount, currency)} · ${record?.status || 'UNKNOWN'}`;
 
     return {
-      category: kind === 'top_up' ? 'payments' : kind === 'funding' ? 'funding' : 'receipts',
+      activityId: record?.id || reference,
+      category: kind === 'top_up'
+        ? 'payments'
+        : kind === 'funding'
+          ? 'funding'
+          : kind === 'invoice'
+            ? 'invoices'
+            : kind === 'payout'
+              ? 'payouts'
+              : 'receipts',
       operation,
       provider,
       status,
       currency,
       amount,
-      icon: kind === 'funding' ? WalletCards : kind === 'top_up' ? CreditCard : FileText,
+      icon: kind === 'funding' || kind === 'payout' ? WalletCards : kind === 'top_up' ? CreditCard : FileText,
       tone: statusTone[status] || 'info',
       title: `${operation} ${normalizeStatus(status)}`,
       body: detail,
       time: formatDate(record?.createdAt),
       timestamp: new Date(record?.createdAt || 0).getTime(),
       search: reference,
+      providerReference: record?.providerReference || '',
       reconciliationState,
       sourceStatus: String(record?.status || 'UNKNOWN').toUpperCase()
     };
@@ -1846,6 +1856,8 @@ export function ActivitySection() {
   const [dateTo, setDateTo] = useState('');
   const [amountMax, setAmountMax] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
   const authoritativeEvents = buildAuthoritativeActivity(context.transactionActivity);
@@ -1879,7 +1891,24 @@ export function ActivitySection() {
   useEffect(() => {
     setPage(1);
     setSelectedEvent(null);
+    setSelectedDetail(null);
   }, [query, category, provider, status, currency, dateFrom, dateTo, amountMax, sort]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedEvent?.activityId || !context.fetchTransactionActivityDetail) {
+      setSelectedDetail(null);
+      setDetailLoading(false);
+      return () => { active = false; };
+    }
+    setDetailLoading(true);
+    context.fetchTransactionActivityDetail(selectedEvent.activityId).then((result) => {
+      if (!active) return;
+      setSelectedDetail(result.success ? result.activity : null);
+      setDetailLoading(false);
+    });
+    return () => { active = false; };
+  }, [context.fetchTransactionActivityDetail, selectedEvent]);
   const filters = [
     ['all', 'All'],
     ['payments', 'Payments'],
@@ -2014,7 +2043,8 @@ export function ActivitySection() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {[
                   ['Transferly transaction ID', selectedEvent.search],
-                  ['Provider', selectedEvent.provider],
+                  ['Provider', selectedDetail?.provider || selectedEvent.provider],
+                  ['Provider reference', selectedDetail?.providerReference || selectedEvent.providerReference || 'Unavailable'],
                   ['Operation', selectedEvent.operation],
                   ['Amount', selectedEvent.amount !== null && selectedEvent.amount !== undefined ? formatMoney(selectedEvent.amount, selectedEvent.currency || 'USD') : 'Unavailable'],
                   ['Currency', selectedEvent.currency || 'Unavailable'],
@@ -2030,8 +2060,32 @@ export function ActivitySection() {
               </div>
               <SurfaceCard as="div" className="mt-4 rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Timeline</p>
-                <Timeline events={[selectedEvent]} />
+                {detailLoading ? (
+                  <p className="mt-3 text-sm font-bold text-[var(--tg-subtitle-text-color)]" role="status">Loading authoritative timeline…</p>
+                ) : (
+                  <Timeline events={(selectedDetail?.timeline || [selectedEvent]).map((event) => ({
+                    ...event,
+                    title: event.title || readableStatusLabel(event.action || 'Activity recorded'),
+                    body: event.body || [event.source, event.providerReference].filter(Boolean).join(' · ') || 'Authoritative activity event',
+                    time: formatDate(event.createdAt),
+                    icon: Activity,
+                    tone: statusTone[String(event.status || '').toUpperCase()] || 'info'
+                  }))} />
+                )}
               </SurfaceCard>
+              {selectedDetail?.webhookHistory?.length ? (
+                <SurfaceCard as="div" className="mt-4 rounded-2xl bg-[var(--tg-secondary-bg-color)] p-4 shadow-none">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--tg-hint-color)]">Webhook history</p>
+                  <div className="mt-3 space-y-2">
+                    {selectedDetail.webhookHistory.map((event) => (
+                      <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--tg-section-bg-color)] px-3 py-2 text-xs font-bold text-[var(--tg-subtitle-text-color)]">
+                        <span>{event.eventType || 'Provider event'} · {event.status || 'recorded'}</span>
+                        <span>{formatDate(event.processedAt || event.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </SurfaceCard>
+              ) : null}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--miniapp-accent-border)] bg-[var(--tg-secondary-bg-color)] p-4">
                 <div>
                   <p className="text-sm font-black text-[var(--tg-text-color)]">Need help with this activity?</p>

@@ -35,6 +35,7 @@ import {
   getPaymentProviderBalance as getPaymentProviderBalanceRequest,
   getMe,
   getPointsFundingConfig as getPointsFundingConfigRequest,
+  getTransactionActivityDetail as getTransactionActivityDetailRequest,
   listDeadLetterJobs as listDeadLetterJobsRequest,
   listInvoiceReminderConfigurations as listInvoiceReminderConfigurationsRequest,
   listAdminWebhookEvents as listAdminWebhookEventsRequest,
@@ -1083,6 +1084,15 @@ export function AppContextProvider({ children }) {
     }
   }, []);
 
+  const fetchTransactionActivityDetail = useCallback(async (activityId) => {
+    try {
+      const payload = await getTransactionActivityDetailRequest(activityId);
+      return { success: true, activity: payload?.activity || null };
+    } catch (error) {
+      return { success: false, activity: null, message: error?.message || 'Transaction detail is temporarily unavailable.' };
+    }
+  }, []);
+
   const markNotificationRead = useCallback(async (notificationId) => {
     try {
       const payload = await markNotificationReadRequest(notificationId);
@@ -2122,6 +2132,7 @@ export function AppContextProvider({ children }) {
     fetchPointsFundingRequests,
     fetchNotifications,
     fetchTransactionActivity,
+    fetchTransactionActivityDetail,
     markNotificationRead,
     createInvoice,
     previewInvoice,

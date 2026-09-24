@@ -30,6 +30,7 @@ test('deduplicates concurrent initial reads', async () => {
   };
 
   const first = readThroughCache('provider-readiness', loader);
+  await Promise.resolve();
   const second = readThroughCache('provider-readiness', loader);
   resolveLoader({ ready: true });
 

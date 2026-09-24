@@ -16,6 +16,12 @@ test('OpenAPI document mirrors the versioned route groups and financial safety c
   assert.ok(document.paths['/api/v1/invoices/payment-links'].get);
   assert.ok(document.paths['/api/v1/admin/finance/analytics.csv'].get);
   assert.ok(document.paths['/api/v1/admin/finance/analytics.pdf'].get);
+  assert.ok(document.paths['/api/v1/me/transaction-activity'].get);
+  assert.ok(document.paths['/api/v1/me/transaction-activity/{id}'].get);
+  assert.deepEqual(
+    document.paths['/api/v1/me/transaction-activity'].get.parameters.find((parameter) => parameter.name === 'kind').schema.enum,
+    ['funding', 'top_up', 'receipt', 'invoice', 'payout']
+  );
   assert.ok(document.components.schemas.Collection);
   assert.ok(document.components.responses.Conflict);
   assert.equal(document['x-transferly-api-versioning'].current, '/api/v1');

@@ -16,6 +16,7 @@ import {
   Sparkles,
   XCircle
 } from 'lucide-react';
+import { normalizeStatus } from '../../lib/statusNormalization.js';
 
 export function StatusBadge({ status = 'pending', animated = true, size = 'md', className = '' }) {
   const statusConfig = {
@@ -270,12 +271,7 @@ export function StatusBadge({ status = 'pending', animated = true, size = 'md', 
     },
   };
 
-  // Normalize status to match keys (handle uppercase, spaces, hyphens)
-  const normalizedStatus = (status || 'pending')
-    .toString()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/-/g, '_');
+  const normalizedStatus = normalizeStatus(status);
   const config = statusConfig[normalizedStatus] || statusConfig.pending;
   const Icon = config.icon;
   const sizeClasses = {

@@ -64,9 +64,13 @@ const supportTicketListQuerySchema = z.object({
 
 const transactionActivityQuerySchema = z.object({
   query: z.string().trim().max(120).optional().default(''),
-  kind: z.enum(['funding', 'top_up', 'receipt']).optional().default(''),
+  kind: z.enum(['funding', 'top_up', 'receipt', 'invoice', 'payout']).optional().default(''),
   status: z.string().trim().max(80).optional().default(''),
   limit: z.coerce.number().int().positive().max(100).default(50)
+}).strict();
+
+const transactionActivityParamsSchema = z.object({
+  id: z.string().trim().min(1).max(160)
 }).strict();
 
 const createSupportTicketSchema = z.object({
@@ -88,6 +92,7 @@ module.exports = {
   createTopUpOrderSchema,
   fundingRequestParamsSchema,
   supportTicketListQuerySchema,
+  transactionActivityParamsSchema,
   transactionActivityQuerySchema,
   submitFundingEvidenceSchema,
   uploadFundingEvidenceSchema,

@@ -24,6 +24,8 @@
  * Financial transaction pages must also support unknown and reconciliation.
  */
 
+import { normalizeStatus, requiresReconciliationUI } from '../../lib/statusNormalization.js';
+
 export const ComponentStatePattern = {
   // Standard state that all components should support
   ALL_PAGES: ['loading', 'empty', 'error', 'success'],
@@ -277,25 +279,14 @@ export const StatusBadgeStates = {
 };
 
 /**
- * Helper: Normalize status string to canonical form
- * 
- * Handles:
- * - Uppercase → lowercase
- * - Spaces/hyphens → underscores
- * - Unknown values → 'pending'
- * 
+ * Helper: Normalize status string to canonical form.
+ * Shared canonicalization is centralized in the statusNormalization helper so
+ * all Mini App surfaces treat "Action Required" and similar aliases consistently.
+ *
  * @param {string|any} status - Input status
  * @returns {string} Normalized status key
  */
-export function normalizeStatus(status) {
-  if (!status) return 'pending';
-  
-  return String(status)
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/-/g, '_')
-    .trim();
-}
+export { normalizeStatus, requiresReconciliationUI } from '../../lib/statusNormalization.js';
 
 /**
  * Helper: Get standard state config for any component
@@ -305,17 +296,6 @@ export function normalizeStatus(status) {
  */
 export function getComponentStateConfig(stateName) {
   return StandardComponentStates[stateName] || StandardComponentStates.error;
-}
-
-/**
- * Helper: Check if a financial state requires reconciliation UI
- * 
- * @param {string} status - Financial status
- * @returns {boolean} True if reconciliation UI should be shown
- */
-export function requiresReconciliationUI(status) {
-  const normalized = normalizeStatus(status);
-  return ['unknown', 'reconciliation_required', 'reconciling'].includes(normalized);
 }
 
 export default {
