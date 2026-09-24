@@ -179,14 +179,14 @@ Apply these at all times — not only during explicit security reviews:
 <!-- BUS:START -->
 ## 🔴 LIVE BOARD — read this before you touch anything
 
-_Generated 2026-09-23T07:00Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
+_Generated 2026-09-23T23:11Z. Do not edit by hand — it is overwritten by the extension / `agent-bus.mjs sync`._
 
 **⚠️ 2 WARNING(S) — your next run may be affected:**
 - `emu37qfu6iap8` **copilot**: User operations now prompts for reason and confirmation before points adjustments and loads authoritative finance profiles; no general audit-log API exists, so no synthetic audit UI was added.
 - `emu3ej6oljlud` **copilot**: Failure-injection test exposed and fixed classification ordering bug: PROVIDER_TIMEOUT now maps to timeout instead of generic provider failure, preserving retry semantics.
 
-**📌 CLAIMED RIGHT NOW (0) — do NOT edit these paths:**
-- _(nobody is working)_
+**📌 CLAIMED RIGHT NOW (1) — do NOT edit these paths:**
+- **copilot**: path:miniapp/src/lib/readCache.js, path:miniapp/src/lib/api.js, path:miniapp/src/lib/readCache.test.js — expires 23:38Z — Implementing Phase 17 safe read caching for provider metadata in the Mini App: bounded stale-while-revalidate cache with request dedup preservation, no caching for financial mutations or user balances.
 
 Full board: use the `trc_team_read` tool, or run `agent-bus.mjs read --agent <you>`.
 <!-- BUS:END -->

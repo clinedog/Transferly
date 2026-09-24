@@ -6,16 +6,32 @@
 import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
-export function BalanceCard({ label, balance, currency = 'USD', isVisible = true }) {
+export function BalanceCard({
+  label,
+  balance,
+  currency = 'USD',
+  isVisible = true,
+  description,
+  source = 'Transferly balance'
+}) {
   const [showBalance, setShowBalance] = React.useState(isVisible);
   const ToggleIcon = showBalance ? Eye : EyeOff;
+  const numericBalance = Number(balance);
+  const formattedBalance = Number.isFinite(numericBalance)
+    ? numericBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—';
 
   return (
-    <div className="miniapp-surface-card p-6 text-[var(--tg-text-color)]">
+    <section className="miniapp-surface-card p-6 text-[var(--tg-text-color)]" aria-label={`${label} balance`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--miniapp-shell-text-muted)]">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--miniapp-shell-text-muted)]">
           {label}
-        </h3>
+          </h3>
+          <p className="mt-1 text-xs font-medium text-[var(--miniapp-shell-text-muted)]">
+            {description || source}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setShowBalance(!showBalance)}
@@ -26,14 +42,14 @@ export function BalanceCard({ label, balance, currency = 'USD', isVisible = true
         </button>
       </div>
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2" aria-live="polite">
         <span className="text-4xl font-black tracking-tight text-[var(--tg-text-color)]">
-          {showBalance ? balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '•••••'}
+          {showBalance ? formattedBalance : '•••••'}
         </span>
         <span className="pb-2 text-lg font-semibold text-[var(--miniapp-shell-text-muted)]">
           {currency}
         </span>
       </div>
-    </div>
+    </section>
   );
 }

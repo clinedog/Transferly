@@ -131,7 +131,14 @@ import {
   isServiceAvailable,
   isServiceLaunchable
 } from '../lib/serviceCatalogueContract';
-import { getProviderDashboard, getProviderResource } from '../lib/api';
+import {
+  createSupportTicket,
+  getNotificationPreferences,
+  getProviderDashboard,
+  getProviderResource,
+  listSupportTickets,
+  updateNotificationPreferences
+} from '../lib/api';
 import {
   getProviderWorkspaceRoute,
   isProviderLaneSupported,
@@ -4326,6 +4333,10 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
   const [openQuestion, setOpenQuestion] = useState(supportFaqs[0]?.question || '');
   const [issueType, setIssueType] = useState('transaction review');
   const [issueDetails, setIssueDetails] = useState('');
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
   const supportContext = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return buildSupportContext({
@@ -4356,13 +4367,71 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
     }
   }, [notify, supportContext]);
 
+  const loadTickets = useCallback(async () => {
+    setTicketsLoading(true);
+    try {
+      const result = await listSupportTickets({ limit: 20 });
+      setTickets(Array.isArray(result?.data) ? result.data : []);
+    } catch {
+      setTickets([]);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
+
+  const submitTicket = useCallback(async () => {
+    const details = issueDetails.trim();
+    if (details.length < 3 || submitting) {
+      setSubmissionError('Add at least three characters so support can investigate.');
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const categoryMap = {
+      'transaction review': 'transaction_review',
+      'funding or points': 'funding_or_points',
+      'account access': 'account_access',
+      'provider availability': 'provider_availability',
+      'bug report': 'bug_report'
+    };
+    setSubmitting(true);
+    setSubmissionError('');
+    try {
+      const result = await createSupportTicket({
+        subject: `${issueType}: ${params.get('transaction') || params.get('from') || 'support request'}`.slice(0, 160),
+        category: categoryMap[issueType] || 'other',
+        details,
+        transactionReference: params.get('transaction') || '',
+        provider: params.get('provider') || '',
+        operation: params.get('operation') || '',
+        context: { source: params.get('from') || params.get('screen') || 'support', status: params.get('status') || '' }
+      });
+      if (!result?.ticket) {
+        throw new Error('Support could not save this request.');
+      }
+      setTickets((previous) => [result.ticket, ...previous]);
+      setIssueDetails('');
+      notify('success');
+      toast.success('Support request submitted');
+    } catch (error) {
+      setSubmissionError(error?.message || 'Support could not save this request. Try again.');
+      notify('error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [issueDetails, issueType, location.search, notify, submitting]);
+
   useEffect(() => {
     return configureMainButton?.({
-      text: 'Copy Support Context',
+      text: submitting ? 'Submitting request…' : 'Submit support request',
       enabled: true,
-      onClick: copyContext
+      onClick: submitTicket
     });
-  }, [configureMainButton, copyContext]);
+  }, [configureMainButton, submitTicket, submitting]);
 
   const filteredFaqs = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -4396,7 +4465,7 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Issue handoff</p>
         <h3 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Tell support what needs attention</h3>
         <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
-          Add a short description before copying the bundle. Nothing is submitted automatically.
+          Add a short description and submit it with the attached context. Transferly confirms submission only after the request is saved.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <label className="text-xs font-black uppercase tracking-[0.12em] text-[var(--tg-hint-color)]">
@@ -4427,6 +4496,27 @@ function SupportSection({ telegram, profile, user, receipts, topUpOrders, paymen
             />
           </label>
         </div>
+        {submissionError ? <p className="mt-3 text-sm font-bold text-red-500" role="alert">{submissionError}</p> : null}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void submitTicket()}
+            disabled={submitting}
+            aria-busy={submitting ? 'true' : undefined}
+            className="miniapp-pressable miniapp-touch-target inline-flex min-h-12 items-center gap-2 rounded-[18px] bg-[var(--tg-button-color)] px-5 text-sm font-black text-[var(--tg-button-text-color)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? <RefreshCw size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+            {submitting ? 'Submitting…' : 'Submit support request'}
+          </button>
+          <button type="button" onClick={copyContext} className="miniapp-pressable miniapp-touch-target min-h-12 rounded-[18px] bg-[var(--tg-secondary-bg-color)] px-5 text-sm font-black text-[var(--tg-text-color)]">Copy context</button>
+        </div>
+      </section>
+      <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm" aria-labelledby="support-history-title">
+        <div className="flex items-center justify-between gap-3">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Support history</p><h3 id="support-history-title" className="mt-2 text-xl font-black text-[var(--tg-text-color)]">Your saved requests</h3></div>
+          <button type="button" onClick={() => void loadTickets()} className="miniapp-touch-target rounded-xl p-3 text-[var(--tg-button-color)]" aria-label="Refresh support history"><RefreshCw size={18} /></button>
+        </div>
+        {ticketsLoading ? <p className="mt-4 text-sm font-bold text-[var(--tg-hint-color)]" role="status">Loading support history…</p> : tickets.length ? <div className="mt-4 space-y-2">{tickets.map((ticket) => <article key={ticket.id} className="rounded-[18px] bg-[var(--tg-secondary-bg-color)] p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-black text-[var(--tg-text-color)]">{ticket.subject}</p><span className="rounded-full bg-[var(--tg-section-bg-color)] px-2 py-1 text-[10px] font-black uppercase text-[var(--tg-hint-color)]">{ticket.status}</span></div><p className="mt-2 text-xs font-semibold text-[var(--tg-subtitle-text-color)]">{ticket.transactionReference ? `Reference: ${ticket.transactionReference}` : 'General support request'}</p></article>)}</div> : <p className="mt-4 text-sm font-bold text-[var(--tg-hint-color)]">No saved support requests yet.</p>}
       </section>
       <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
@@ -4916,7 +5006,10 @@ function SettingsSection({ telegram, profile, user }) {
     return defaultScreenOptions.some((option) => option.id === stored) ? stored : 'studio';
   });
   const [notificationPreferences, setNotificationPreferences] = useState(() => {
-    const fallback = { funding: true, operations: true, security: true };
+    const fallback = {
+      categories: { funding: true, operations: true, security: true },
+      channels: { in_app: true, telegram: true, email: false, webhook: false }
+    };
     if (typeof window === 'undefined') {
       return fallback;
     }
@@ -4924,11 +5017,17 @@ function SettingsSection({ telegram, profile, user }) {
     try {
       const stored = window.localStorage.getItem(NOTIFICATION_PREFERENCES_KEY);
       const parsed = stored ? JSON.parse(stored) : null;
-      return parsed && typeof parsed === 'object' ? { ...fallback, ...parsed } : fallback;
+      if (!parsed || typeof parsed !== 'object') return fallback;
+      return {
+        categories: { ...fallback.categories, ...(parsed.categories || parsed) },
+        channels: { ...fallback.channels, ...(parsed.channels || {}) }
+      };
     } catch {
       return fallback;
     }
   });
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] = useState(false);
+  const [notificationPreferencesSaving, setNotificationPreferencesSaving] = useState(false);
 
   const selectedScreen = defaultScreenOptions.find((option) => option.id === defaultScreen) || defaultScreenOptions[1];
 
@@ -4943,6 +5042,46 @@ function SettingsSection({ telegram, profile, user }) {
       window.localStorage.setItem(NOTIFICATION_PREFERENCES_KEY, JSON.stringify(notificationPreferences));
     }
   }, [notificationPreferences]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let mounted = true;
+    getNotificationPreferences()
+      .then((payload) => {
+        if (!mounted || !payload?.preferences?.categories) return;
+        setNotificationPreferences((current) => ({
+          categories: { ...current.categories, ...payload.preferences.categories },
+          channels: { ...current.channels, ...(payload.preferences.channels || {}) }
+        }));
+      })
+      .catch(() => {
+        if (mounted) toast.error('Notification preferences are using this device\'s saved defaults.');
+      })
+      .finally(() => {
+        if (mounted) setNotificationPreferencesLoaded(true);
+      });
+    return () => { mounted = false; };
+  }, [user?.id]);
+
+  const toggleNotificationPreference = useCallback(async (group, key) => {
+    const previous = notificationPreferences;
+    const enabled = previous[group]?.[key] !== false;
+    const next = {
+      ...previous,
+      [group]: { ...previous[group], [key]: !enabled }
+    };
+    setNotificationPreferences(next);
+    if (!user?.id || !notificationPreferencesLoaded) return;
+    setNotificationPreferencesSaving(true);
+    try {
+      await updateNotificationPreferences({ categories: next.categories, channels: next.channels });
+    } catch (error) {
+      setNotificationPreferences(previous);
+      toast.error(error?.message || 'Unable to save notification preference.');
+    } finally {
+      setNotificationPreferencesSaving(false);
+    }
+  }, [notificationPreferences, notificationPreferencesLoaded, user?.id]);
 
   const openSelectedScreen = useCallback(() => {
     impact('medium');
@@ -5031,7 +5170,7 @@ function SettingsSection({ telegram, profile, user }) {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Notification preferences</p>
             <h3 className="mt-2 text-xl font-black tracking-[-0.035em] text-[var(--tg-text-color)]">Choose what this device highlights</h3>
             <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">
-              These controls only tune local presentation. Authoritative notifications remain available in the Notifications workspace.
+              These account-level controls shape notification categories. Authoritative notifications remain available in the Notifications workspace.
             </p>
           </div>
         </div>
@@ -5041,14 +5180,15 @@ function SettingsSection({ telegram, profile, user }) {
             ['operations', 'Invoices and payouts', 'Provider updates and action-required records'],
             ['security', 'Security and access', 'Session, identity, and safety notices']
           ].map(([key, label, description]) => {
-            const enabled = notificationPreferences[key] !== false;
+            const enabled = notificationPreferences.categories?.[key] !== false;
             return (
               <button
                 key={key}
                 type="button"
                 role="switch"
                 aria-checked={enabled}
-                onClick={() => setNotificationPreferences((current) => ({ ...current, [key]: !enabled }))}
+                disabled={notificationPreferencesSaving}
+                onClick={() => toggleNotificationPreference('categories', key)}
                 className="flex min-h-16 w-full items-center justify-between gap-4 rounded-[20px] bg-[var(--tg-secondary-bg-color)] px-4 py-3 text-left transition active:scale-[0.99]"
               >
                 <span className="min-w-0">
@@ -5061,6 +5201,38 @@ function SettingsSection({ telegram, profile, user }) {
               </button>
             );
           })}
+        </div>
+        <div className="mt-5 border-t border-[var(--miniapp-border-color)] pt-5">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--tg-hint-color)]">Delivery channels</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {[
+              ['in_app', 'In-app inbox', 'Always available inside Transferly'],
+              ['telegram', 'Telegram', 'Bot and Mini App alerts'],
+              ['email', 'Email', 'Only when an email address is configured'],
+              ['webhook', 'Organization webhook', 'For organization notification endpoints']
+            ].map(([key, label, description]) => {
+              const enabled = notificationPreferences.channels?.[key] !== false;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  disabled={notificationPreferencesSaving}
+                  onClick={() => toggleNotificationPreference('channels', key)}
+                  className="flex min-h-14 items-center justify-between gap-3 rounded-[18px] bg-[var(--tg-secondary-bg-color)] px-3 py-2 text-left transition active:scale-[0.99]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-[var(--tg-text-color)]">{label}</span>
+                    <span className="mt-1 block text-[11px] font-semibold text-[var(--tg-subtitle-text-color)]">{description}</span>
+                  </span>
+                  <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${enabled ? 'justify-end bg-[var(--tg-button-color)]' : 'justify-start bg-black/10'}`}>
+                    <span className={`h-5 w-5 rounded-full shadow-sm ${enabled ? 'bg-[var(--tg-button-text-color)]' : 'bg-[var(--tg-hint-color)]'}`} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 

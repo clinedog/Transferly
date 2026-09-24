@@ -58,10 +58,37 @@ const uploadFundingEvidenceSchema = z.object({
   userNote: z.string().trim().max(1000).optional().default('')
 }).strict();
 
+const supportTicketListQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).default(50)
+}).strict();
+
+const transactionActivityQuerySchema = z.object({
+  query: z.string().trim().max(120).optional().default(''),
+  kind: z.enum(['funding', 'top_up', 'receipt']).optional().default(''),
+  status: z.string().trim().max(80).optional().default(''),
+  limit: z.coerce.number().int().positive().max(100).default(50)
+}).strict();
+
+const createSupportTicketSchema = z.object({
+  subject: z.string().trim().min(3).max(160),
+  category: z.enum(['transaction_review', 'funding_or_points', 'account_access', 'provider_availability', 'bug_report', 'other']),
+  details: z.string().trim().min(3).max(2000),
+  transactionReference: z.string().trim().max(160).optional().default(''),
+  provider: z.string().trim().max(80).optional().default(''),
+  operation: z.string().trim().max(120).optional().default(''),
+  context: z.object({
+    source: z.string().trim().max(80).optional(),
+    status: z.string().trim().max(80).optional()
+  }).strict().optional().default({})
+}).strict();
+
 module.exports = {
   createFundingRequestSchema,
+  createSupportTicketSchema,
   createTopUpOrderSchema,
   fundingRequestParamsSchema,
+  supportTicketListQuerySchema,
+  transactionActivityQuerySchema,
   submitFundingEvidenceSchema,
   uploadFundingEvidenceSchema,
   topUpOrderParamsSchema,

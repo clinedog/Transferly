@@ -62,6 +62,7 @@ import {
   listPayouts as listPayoutsRequest,
   listPointsFundingRequests as listPointsFundingRequestsRequest,
   listNotifications as listNotificationsRequest,
+  listTransactionActivity as listTransactionActivityRequest,
   markNotificationRead as markNotificationReadRequest,
   previewInvoice as previewInvoiceRequest,
   previewPayout as previewPayoutRequest,
@@ -503,6 +504,7 @@ export function AppContextProvider({ children }) {
   const [pointsFundingConfig, setPointsFundingConfigState] = useState({ packages: [], payment_destination: null, evidence_policy: null });
   const [pointsFundingRequests, setPointsFundingRequestsState] = useState([]);
   const [notifications, setNotificationsState] = useState([]);
+  const [transactionActivity, setTransactionActivityState] = useState([]);
   const [paymentProviders, setPaymentProvidersState] = useState([]);
   const [providerCapabilities, setProviderCapabilitiesState] = useState([]);
   const [providerCapabilitiesLoaded, setProviderCapabilitiesLoaded] = useState(false);
@@ -1054,10 +1056,30 @@ export function AppContextProvider({ children }) {
       const payload = await listNotificationsRequest({ limit: 50 });
       const records = Array.isArray(payload?.data) ? payload.data : [];
       setNotificationsState(records);
-      return records;
+      return { success: true, records };
     } catch (error) {
       console.warn('Notifications are temporarily unavailable', error);
-      return [];
+      return {
+        success: false,
+        records: [],
+        message: error?.message || 'Notifications are temporarily unavailable.'
+      };
+    }
+  }, []);
+
+  const fetchTransactionActivity = useCallback(async (params = {}) => {
+    try {
+      const payload = await listTransactionActivityRequest({ limit: 100, ...params });
+      const records = Array.isArray(payload?.data) ? payload.data : [];
+      setTransactionActivityState(records);
+      return { success: true, records };
+    } catch (error) {
+      console.warn('Transaction activity is temporarily unavailable', error);
+      return {
+        success: false,
+        records: [],
+        message: error?.message || 'Transaction activity is temporarily unavailable.'
+      };
     }
   }, []);
 
@@ -1331,7 +1353,8 @@ export function AppContextProvider({ children }) {
     void fetchPointsFundingConfig();
     void fetchPointsFundingRequests();
     void fetchNotifications();
-  }, [fetchNotifications, fetchPointsFundingConfig, fetchPointsFundingRequests, user?.id]);
+    void fetchTransactionActivity();
+  }, [fetchNotifications, fetchPointsFundingConfig, fetchPointsFundingRequests, fetchTransactionActivity, user?.id]);
 
   const retryInitialization = useCallback(() => {
     authStateManager.resetRetries();
@@ -1364,6 +1387,7 @@ export function AppContextProvider({ children }) {
     setPointsFundingConfigState({ packages: [], payment_destination: null, evidence_policy: null });
     setPointsFundingRequestsState([]);
     setNotificationsState([]);
+    setTransactionActivityState([]);
     setPaymentProvidersState([]);
     setProviderHealthState([]);
     setProviderBalancesState({});
@@ -2066,6 +2090,7 @@ export function AppContextProvider({ children }) {
     pointsFundingConfig,
     pointsFundingRequests,
     notifications,
+    transactionActivity,
     paymentProviders,
     providerCapabilities,
     providerCapabilitiesLoaded,
@@ -2096,6 +2121,7 @@ export function AppContextProvider({ children }) {
     fetchPointsFundingConfig,
     fetchPointsFundingRequests,
     fetchNotifications,
+    fetchTransactionActivity,
     markNotificationRead,
     createInvoice,
     previewInvoice,

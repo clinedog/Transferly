@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
   Copy,
@@ -190,6 +190,20 @@ function buildShareText(receipt) {
   ].join('\n');
 }
 
+function buildSupportTarget(receipt) {
+  const details = describeReceipt(receipt);
+  const rawDetails = getReceiptDetails(receipt);
+  const params = new URLSearchParams({
+    from: 'vault',
+    transaction: String(rawDetails.transactionRef || rawDetails.sessionId || details.meta || ''),
+    provider: String(rawDetails.provider || 'transferly'),
+    operation: details.type === 'email' ? 'notification receipt' : 'wallet record',
+    status: String(details.status || 'UNKNOWN')
+  });
+
+  return `/miniapp/support?${params.toString()}`;
+}
+
 function StatPill({ label, value, icon: Icon }) {
   return (
     <div className="rounded-[22px] bg-[var(--tg-section-bg-color)] p-4 shadow-sm">
@@ -311,7 +325,7 @@ function ReceiptDetail({ receipt, duplicating, onCopy, onDuplicate }) {
           <p className="mt-2 line-clamp-4 text-sm font-semibold leading-6 text-[var(--tg-text-color)]">{getSummaryText(receipt)}</p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <button
             type="button"
             onClick={onDuplicate}
@@ -330,6 +344,13 @@ function ReceiptDetail({ receipt, duplicating, onCopy, onDuplicate }) {
             <Copy size={16} aria-hidden="true" />
             Copy summary
           </button>
+          <Link
+            to={buildSupportTarget(receipt)}
+            className="miniapp-pressable miniapp-touch-target flex items-center justify-center gap-2 rounded-[18px] bg-[var(--tg-secondary-bg-color)] px-4 py-3 text-sm font-black text-[var(--tg-text-color)] motion-safe:transition"
+          >
+            <Mail size={16} aria-hidden="true" />
+            Get support
+          </Link>
         </div>
       </div>
     </section>

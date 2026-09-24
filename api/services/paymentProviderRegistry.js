@@ -1,7 +1,12 @@
 const { providerModuleRegistry } = require('../providers/moduleRegistry');
+const { AppError } = require('../utils/errors');
 const { selectBestProvider, filterByCapability, validateCapabilities } = require('../core/financial/providerRegistry');
-const { normalizeExecutionStatus } = require('../core/financial/providerContract');
+const {
+  CANONICAL_OPERATION_METHODS,
+  normalizeExecutionStatus
+} = require('../core/financial/providerContract');
 const { executeProviderOperation } = require('../core/financial/providerExecution');
+const { executeFinancialOperation } = require('../core/financial/financialExecutionService');
 
 function listProviders() {
   return providerModuleRegistry.list().map((provider) => provider.adapter.getSummary());
@@ -35,6 +40,51 @@ async function executeOperation({ provider, operation, input, environment, mutat
   return executeProviderOperation(getProvider(provider), operation, input, {
     environment,
     mutating
+  });
+}
+
+/**
+ * Additive canonical execution entry point. Existing executeOperation callers
+ * retain the raw adapter response; new financial flows can opt into the
+ * context, idempotency, and durable-result boundary.
+ */
+async function executeFinancially({ context, input, environment, mutating } = {}) {
+  if (!context?.provider) {
+    throw new AppError(422, 'FINANCIAL_PROVIDER_REQUIRED', 'A provider is required for canonical financial execution.');
+  }
+
+  return executeFinancialOperation({
+    context,
+    execute: async () => {
+      const adapterOperation = CANONICAL_OPERATION_METHODS[context.operation]?.find((method) =>
+        typeof getProvider(context.provider)?.[method] === 'function'
+      );
+      if (!adapterOperation) {
+        throw new AppError(422, 'PAYMENT_PROVIDER_OPERATION_UNAVAILABLE',
+          `Provider ${context.provider} does not implement ${context.operation}.`, {
+            provider: context.provider,
+            operation: context.operation
+          });
+      }
+      const response = await executeOperation({
+        provider: context.provider,
+        operation: adapterOperation,
+        input,
+        environment: environment || context.environment,
+        mutating
+      });
+
+      return {
+        status: response?.status || response?.state || response?.outcome || 'unknown',
+        authoritative: response?.authoritative === true,
+        reconciliationRequired: response?.reconciliationRequired === true ||
+          response?.reconciliation_required === true ||
+          String(response?.status || response?.state || response?.outcome || '').toLowerCase() === 'unknown',
+        resourceId: response?.resourceId || response?.id || null,
+        providerRequestId: response?.providerRequestId || response?.provider_request_id || null,
+        data: response
+      };
+    }
   });
 }
 
@@ -144,6 +194,7 @@ module.exports = {
     listProviderAdapterContracts,
     getProviderAdapterContract,
     executeOperation,
+    executeFinancially,
     selectProvider,
     listProvidersWithCapability,
     validateProviderCapabilities

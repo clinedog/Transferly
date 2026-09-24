@@ -109,8 +109,15 @@ async function installTelegramRuntime(page, options = {}) {
 async function mockMiniAppApi(page, options = {}) {
   const requests = [];
   let telegramLoginAttempts = 0;
+  let notificationAttempts = 0;
   let currentFundingRequest = { ...fundingRequest };
+  let supportTickets = [];
+  let notificationPreferences = {
+    channels: { in_app: true, telegram: true, email: false, webhook: false },
+    categories: { funding: true, operations: true, security: true }
+  };
   const failTelegramLoginAttempts = Number(options.failTelegramLoginAttempts || 0);
+  const failNotificationAttempts = Number(options.failNotificationAttempts || 0);
 
   await page.route(/\/api(\/|$)/, async (route) => {
     const request = route.request();
@@ -223,7 +230,78 @@ async function mockMiniAppApi(page, options = {}) {
     }
 
     if (path === '/api/user/me/notifications') {
+      notificationAttempts += 1;
+      if (notificationAttempts <= failNotificationAttempts) {
+        await json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Notifications are temporarily unavailable.'
+          }
+        }, 503);
+        return;
+      }
       await json({ data: [] });
+      return;
+    }
+
+    if (path === '/api/user/me/notification-preferences' && method === 'GET') {
+      await json({ preferences: notificationPreferences });
+      return;
+    }
+
+    if (path === '/api/user/me/notification-preferences' && method === 'PATCH') {
+      notificationPreferences = {
+        ...notificationPreferences,
+        ...(request.postDataJSON() || {}),
+        categories: {
+          ...notificationPreferences.categories,
+          ...(request.postDataJSON()?.categories || {})
+        }
+      };
+      await json({ preferences: notificationPreferences });
+      return;
+    }
+
+    if (path === '/api/user/me/transaction-activity') {
+      await json({
+        data: [{
+          id: currentFundingRequest.id,
+          kind: 'funding',
+          reference: currentFundingRequest.public_reference,
+          provider: currentFundingRequest.payment_method,
+          operation: 'points funding',
+          status: currentFundingRequest.status,
+          amountMinor: currentFundingRequest.expected_amount_minor,
+          points: currentFundingRequest.requested_points,
+          currency: currentFundingRequest.currency,
+          createdAt: currentFundingRequest.created_at,
+          reconciliationState: 'NOT_APPLICABLE'
+        }]
+      });
+      return;
+    }
+
+    if (path === '/api/user/me/support-tickets' && method === 'GET') {
+      await json({ data: supportTickets });
+      return;
+    }
+
+    if (path === '/api/user/me/support-tickets' && method === 'POST') {
+      const payload = request.postDataJSON();
+      const ticket = {
+        id: `support-${supportTickets.length + 1}`,
+        subject: payload.subject,
+        category: payload.category,
+        details: payload.details,
+        transactionReference: payload.transactionReference,
+        provider: payload.provider,
+        operation: payload.operation,
+        context: payload.context,
+        status: 'OPEN',
+        createdAt: '2026-08-29T02:30:00.000Z'
+      };
+      supportTickets = [ticket, ...supportTickets];
+      await json({ ticket }, 201);
       return;
     }
 
@@ -293,6 +371,55 @@ test('telegram auth recovery retries temporary failures and deduplicates recover
   await expect.poll(() => api.requests.filter((entry) => entry.path === '/api/auth/telegram-mini-app').length).toBeGreaterThan(1);
   await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('transferly_api_session'))).toBe('tg-session-token');
   await expect(page.getByText('Telegram session secured').last()).toBeVisible();
+});
+
+test('notifications show an actionable unavailable state and retry instead of a false empty inbox', async ({ page }) => {
+  await installTelegramRuntime(page, { startParam: 'notifications' });
+  // App bootstrap preloads notifications before the workspace mounts; fail both
+  // that request and the first workspace request so the retry UI is exercised.
+  const api = await mockMiniAppApi(page, { failNotificationAttempts: 2 });
+
+  await page.goto('/miniapp/notifications#tgWebAppStartParam=notifications');
+
+  await expect(page.getByRole('heading', { name: 'Notifications are unavailable' })).toBeVisible();
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect.poll(() => api.requests.filter((entry) => entry.path === '/api/user/me/notifications').length).toBeGreaterThan(1);
+  await expect(page.getByRole('heading', { name: 'Notifications are unavailable' })).toHaveCount(0);
+  await expect(page.getByText('No notifications yet')).toBeVisible();
+});
+
+test('support submits a persisted ticket with transaction context', async ({ page }) => {
+  await installTelegramRuntime(page, { startParam: 'support' });
+  const api = await mockMiniAppApi(page);
+
+  await page.goto('/miniapp/support?from=vault&transaction=TRX-1001&provider=transferly&operation=wallet%20record&status=PROCESSING#tgWebAppStartParam=support');
+
+  await page.getByLabel('Support issue details').fill('Please verify this pending wallet record.');
+  await page.getByRole('button', { name: 'Submit support request' }).click();
+
+  await expect.poll(() => api.requests.find((entry) => entry.path === '/api/user/me/support-tickets' && entry.method === 'POST')?.body).toMatchObject({
+    category: 'transaction_review',
+    transactionReference: 'TRX-1001',
+    provider: 'transferly',
+    operation: 'wallet record',
+    context: { source: 'vault', status: 'PROCESSING' }
+  });
+  await expect(page.getByText('Support request submitted')).toBeVisible();
+  await expect(page.getByText(/Reference: TRX-1001/)).toBeVisible();
+});
+
+test('settings persist account notification category preferences', async ({ page }) => {
+  await installTelegramRuntime(page, { startParam: 'settings' });
+  const api = await mockMiniAppApi(page);
+
+  await page.goto('/miniapp/settings#tgWebAppStartParam=settings');
+  const fundingToggle = page.getByRole('switch', { name: 'Funding and points' });
+  await expect(fundingToggle).toBeVisible();
+  await fundingToggle.click();
+
+  await expect.poll(() => api.requests.find((entry) => entry.path === '/api/user/me/notification-preferences' && entry.method === 'PATCH')?.body).toMatchObject({
+    categories: { funding: false }
+  });
 });
 
 test('mini app wallet shows backend-backed funding status center and safe evidence copy', async ({ page }) => {

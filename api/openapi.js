@@ -188,6 +188,44 @@ function buildOpenApiDocument({ baseUrl } = {}) {
         responses: { 200: { $ref: '#/components/responses/Resource' }, ...errorResponses() }
       }
     },
+    '/api/v1/me/notifications': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'List authenticated user notifications',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } }],
+        responses: { 200: { $ref: '#/components/responses/Collection' }, ...errorResponses() }
+      }
+    },
+    '/api/v1/me/notification-preferences': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'Get authenticated user notification preferences',
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { $ref: '#/components/responses/Resource' }, ...errorResponses() }
+      },
+      patch: {
+        tags: ['Notifications'],
+        summary: 'Update authenticated user notification preferences',
+        security: [{ bearerAuth: [] }],
+        requestBody: { $ref: '#/components/requestBodies/Resource' },
+        responses: { 200: { $ref: '#/components/responses/Resource' }, ...errorResponses() }
+      }
+    },
+    '/api/v1/me/transaction-activity': {
+      get: {
+        tags: ['Transactions'],
+        summary: 'List authenticated user transaction activity',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'query', in: 'query', schema: { type: 'string', maxLength: 120 } },
+          { name: 'kind', in: 'query', schema: { type: 'string', enum: ['funding', 'top_up', 'receipt'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', maxLength: 80 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } }
+        ],
+        responses: { 200: { $ref: '#/components/responses/Collection' }, ...errorResponses() }
+      }
+    },
     '/api/v1/me/organizations': {
       get: {
         tags: ['Organizations'],

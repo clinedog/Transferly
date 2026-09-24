@@ -438,6 +438,14 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created_at
 ON notifications (user_id, created_at);
 
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id TEXT PRIMARY KEY,
+  channels_json TEXT NOT NULL,
+  categories_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS payment_ops_issues (
   id TEXT PRIMARY KEY,
   entity_type TEXT NOT NULL,

@@ -5,6 +5,7 @@ const { walletRepository } = require('../repositories/walletRepository');
 const { AppError } = require('../utils/errors');
 const { ensurePositiveMoney, ensureSameCurrency } = require('../utils/money');
 const { BALANCE_BUCKET, LEDGER_ENTRY_TYPE } = require('../utils/constants');
+const { validateLedgerEntry } = require('../core/financial/ledgerContract');
 
 const ledgerBucketToWalletField = Object.freeze({
   [BALANCE_BUCKET.PENDING]: 'pendingBalanceCents',
@@ -37,6 +38,7 @@ async function findLedgerEntryByKey(client, entryKey) {
 }
 
 async function insertLedgerEntry(client, input) {
+  const entry = validateLedgerEntry(input);
   const organizationId = input.organizationId || `personal:${input.userId}`;
   await client.run(
     `
@@ -52,10 +54,10 @@ async function insertLedgerEntry(client, input) {
       input.userId,
       organizationId,
       input.type,
-      input.debitBucket || null,
-      input.creditBucket || null,
-      input.amountCents,
-      input.currencyCode,
+      entry.debitBucket,
+      entry.creditBucket,
+      entry.amountCents,
+      entry.currencyCode,
       input.referenceType,
       input.referenceId,
       input.externalReference || null,

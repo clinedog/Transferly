@@ -2,6 +2,7 @@ const { randomUUID } = require('node:crypto');
 
 const { db } = require('../db');
 const { parseJson, serializeJson } = require('../utils/records');
+const { buildEventEnvelope } = require('../core/financial/eventEnvelope');
 
 const OUTBOX_STATUS = Object.freeze({
   PENDING: 'pending',
@@ -14,8 +15,11 @@ function mapOutboxEvent(row) {
   if (!row) return null;
   return {
     id: row.id,
+    eventId: row.id,
     semanticKey: row.semantic_key,
     eventType: row.event_type,
+    version: 1,
+    occurredAt: row.created_at,
     aggregateType: row.aggregate_type,
     aggregateId: row.aggregate_id,
     queueName: row.queue_name,
@@ -32,6 +36,10 @@ function mapOutboxEvent(row) {
     lastErrorCode: row.last_error_code,
     lastErrorMessage: row.last_error_message,
     correlationId: row.correlation_id,
+    causationId: null,
+    tenantId: null,
+    actorId: null,
+    resourceId: row.aggregate_id,
     dispatchedAt: row.dispatched_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -103,6 +111,18 @@ function semanticFieldsMatch(existing, data) {
 }
 
 async function createOrGet(data, client = db) {
+  const event = buildEventEnvelope({
+    eventId: data.id,
+    eventType: data.eventType,
+    version: data.version,
+    occurredAt: data.occurredAt || data.createdAt,
+    tenantId: data.tenantId,
+    actorId: data.actorId,
+    resourceId: data.resourceId || data.aggregateId,
+    correlationId: data.correlationId,
+    causationId: data.causationId,
+    payload: data.payload
+  });
   const existing = await findBySemanticKey(data.semanticKey, client);
   if (existing) {
     if (!semanticFieldsMatch(existing, data)) {
@@ -113,8 +133,8 @@ async function createOrGet(data, client = db) {
     return existing;
   }
 
-  const id = data.id || randomUUID();
-  const now = data.createdAt || new Date().toISOString();
+  const id = event.eventId || randomUUID();
+  const now = event.occurredAt;
   await client.run(
     `INSERT INTO outbox_events (
       id, semantic_key, event_type, aggregate_type, aggregate_id, queue_name,

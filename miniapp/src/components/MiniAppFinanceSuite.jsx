@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Activity,
@@ -1785,6 +1785,43 @@ function buildActivity({ invoices, payouts, topUpOrders, receipts, paymentIssues
   ].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
 }
 
+function buildAuthoritativeActivity(records = []) {
+  return records.map((record) => {
+    const reconciliationState = String(record?.reconciliationState || 'NOT_APPLICABLE').toUpperCase();
+    const status = reconciliationState !== 'NOT_APPLICABLE'
+      ? reconciliationState
+      : String(record?.status || 'UNKNOWN').toUpperCase();
+    const kind = String(record?.kind || 'activity').toLowerCase();
+    const operation = record?.operation || kind;
+    const provider = providerLabel(record?.provider || 'transferly', record?.provider || 'Transferly');
+    const currency = record?.currency || 'USD';
+    const amount = record?.amountMinor == null ? null : Number(record.amountMinor) / 100;
+    const points = record?.points == null ? null : Number(record.points);
+    const reference = record?.reference || record?.id || 'unavailable';
+    const detail = amount === null
+      ? `${points === null ? 'Activity' : `${points.toLocaleString()} points`} · ${record?.status || 'UNKNOWN'}`
+      : `${formatMoney(amount, currency)} · ${record?.status || 'UNKNOWN'}`;
+
+    return {
+      category: kind === 'top_up' ? 'payments' : kind === 'funding' ? 'funding' : 'receipts',
+      operation,
+      provider,
+      status,
+      currency,
+      amount,
+      icon: kind === 'funding' ? WalletCards : kind === 'top_up' ? CreditCard : FileText,
+      tone: statusTone[status] || 'info',
+      title: `${operation} ${normalizeStatus(status)}`,
+      body: detail,
+      time: formatDate(record?.createdAt),
+      timestamp: new Date(record?.createdAt || 0).getTime(),
+      search: reference,
+      reconciliationState,
+      sourceStatus: String(record?.status || 'UNKNOWN').toUpperCase()
+    };
+  });
+}
+
 function buildTransactionSupportHref(event) {
   const params = new URLSearchParams({
     from: 'activity',
@@ -1811,7 +1848,12 @@ export function ActivitySection() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
-  const events = buildActivity(context);
+  const authoritativeEvents = buildAuthoritativeActivity(context.transactionActivity);
+  const authoritativeKeys = new Set(authoritativeEvents.map((event) => event.search));
+  const events = [
+    ...buildActivity(context).filter((event) => !authoritativeKeys.has(event.search)),
+    ...authoritativeEvents
+  ].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
   const providers = [...new Set(events.map((event) => event.provider).filter(Boolean))].sort();
   const currencies = [...new Set(events.map((event) => event.currency).filter(Boolean))].sort();
   const filtered = events.filter((event) => {
@@ -1841,6 +1883,7 @@ export function ActivitySection() {
   const filters = [
     ['all', 'All'],
     ['payments', 'Payments'],
+    ['funding', 'Funding'],
     ['invoices', 'Invoices'],
     ['payouts', 'Payouts'],
     ['refunds', 'Refunds'],
@@ -2152,22 +2195,40 @@ export function AnalyticsSection() {
 export function NotificationsSection() {
   const { notifications, fetchNotifications, markNotificationRead } = useAppContext();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [markingReadId, setMarkingReadId] = useState('');
   const unread = notifications.filter((notification) => !notification.read_at);
 
-  useEffect(() => {
-    let active = true;
-    fetchNotifications().finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
+  const loadNotifications = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const result = await fetchNotifications();
+    if (!result?.success) {
+      setError(result?.message || 'Notifications are temporarily unavailable.');
+    }
+    setLoading(false);
   }, [fetchNotifications]);
 
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
   const openNotification = async (notification) => {
-    if (!notification.read_at) {
-      await markNotificationRead(notification.id);
+    if (notification.read_at || markingReadId) {
+      return;
     }
+
+    setMarkingReadId(notification.id);
+    const result = await markNotificationRead(notification.id);
+    setMarkingReadId('');
+    if (!result.success) {
+      toast.error(result.message || 'Unable to update this notification. Try again.');
+    }
+  };
+
+  const notificationTarget = (notification) => {
+    const target = String(notification.data?.deep_link || '');
+    return target.startsWith('/miniapp/') ? target : '/miniapp/notifications';
   };
 
   return (
@@ -2184,15 +2245,30 @@ export function NotificationsSection() {
             <div key={item} className="h-24 animate-pulse rounded-[22px] bg-[var(--tg-secondary-bg-color)]" />
           ))}
         </div>
+      ) : error ? (
+        <section className="rounded-[30px] bg-[var(--tg-section-bg-color)] p-6 text-center shadow-sm" role="alert">
+          <AlertTriangle size={34} className="mx-auto text-amber-500" aria-hidden="true" />
+          <h2 className="mt-3 text-lg font-black text-[var(--tg-text-color)]">Notifications are unavailable</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--tg-subtitle-text-color)]">{error}</p>
+          <button
+            type="button"
+            onClick={() => void loadNotifications()}
+            className="miniapp-pressable miniapp-touch-target mt-4 inline-flex items-center gap-2 rounded-[18px] bg-[var(--tg-button-color)] px-4 py-3 text-sm font-black text-[var(--tg-button-text-color)]"
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            Try again
+          </button>
+        </section>
       ) : notifications.length ? (
         <section className="space-y-3 rounded-[30px] bg-[var(--tg-section-bg-color)] p-5 shadow-sm">
           {notifications.map((notification) => {
-            const target = notification.data?.deep_link || '/miniapp/notifications';
+            const target = notificationTarget(notification);
             return (
               <Link
                 key={notification.id}
                 to={target}
                 onClick={() => openNotification(notification)}
+                aria-busy={markingReadId === notification.id ? 'true' : undefined}
                 className={`block rounded-[22px] border p-4 transition active:scale-[0.99] ${notification.read_at ? 'border-transparent bg-[var(--tg-secondary-bg-color)]' : 'border-[var(--tg-button-color)] bg-[color-mix(in_srgb,var(--tg-button-color)_8%,var(--tg-secondary-bg-color))]'}`}
               >
                 <div className="flex items-start gap-3">

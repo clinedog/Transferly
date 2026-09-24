@@ -1,6 +1,7 @@
 const { assertCanAccessUserResource } = require('../middleware/authenticateRequest');
 const {
   createTopUpOrderSchema,
+  createSupportTicketSchema,
   createFundingRequestSchema,
   fundingRequestParamsSchema,
   submitFundingEvidenceSchema,
@@ -8,11 +9,32 @@ const {
   topUpOrderParamsSchema,
   updateTopUpOrderStatusSchema,
   updateCurrentUserProfileSchema,
-  userPointsParamsSchema
+  userPointsParamsSchema,
+  supportTicketListQuerySchema,
+  transactionActivityQuerySchema
 } = require('../schemas/slipcraftUserSchemas');
 const { slipcraftUserService } = require('../services/slipcraftUserService');
 const { pointsFundingService } = require('../services/pointsFundingService');
 const { topUpOrderService } = require('../services/topUpOrderService');
+const { supportTicketService } = require('../services/supportTicketService');
+const { transactionActivityService } = require('../services/transactionActivityService');
+
+async function listCurrentUserTransactionActivityController(request, response) {
+  const query = transactionActivityQuerySchema.parse(request.query || {});
+  response.json(await transactionActivityService.listUserActivity({ userId: request.auth.userId, ...query }));
+}
+
+async function listCurrentUserSupportTicketsController(request, response) {
+  const query = supportTicketListQuerySchema.parse(request.query || {});
+  const tickets = await supportTicketService.listTickets({ userId: request.auth.userId, limit: query.limit });
+  response.json({ data: tickets });
+}
+
+async function createCurrentUserSupportTicketController(request, response) {
+  const body = createSupportTicketSchema.parse(request.body || {});
+  const ticket = await supportTicketService.createTicket({ userId: request.auth.userId, ...body });
+  response.status(201).json({ ticket });
+}
 
 async function getFundingConfigController(_request, response) {
   response.json(await pointsFundingService.getFundingConfig());
@@ -112,12 +134,15 @@ async function updateCurrentUserTopUpOrderStatusController(request, response) {
 
 module.exports = {
   createCurrentUserFundingRequestController,
+  createCurrentUserSupportTicketController,
   createCurrentUserTopUpOrderController,
   deleteCurrentUserAccountController,
   getCurrentUserFundingEvidenceController,
   getFundingConfigController,
   getUserPointsController,
   listCurrentUserFundingRequestsController,
+  listCurrentUserSupportTicketsController,
+  listCurrentUserTransactionActivityController,
   listCurrentUserTopUpOrdersController,
   submitCurrentUserFundingEvidenceController,
   uploadCurrentUserFundingEvidenceController,

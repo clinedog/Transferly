@@ -3,11 +3,14 @@ const express = require('express');
 const {
   createCurrentUserTopUpOrderController,
   createCurrentUserFundingRequestController,
+  createCurrentUserSupportTicketController,
   deleteCurrentUserAccountController,
   getCurrentUserFundingEvidenceController,
   getFundingConfigController,
   getUserPointsController,
   listCurrentUserFundingRequestsController,
+  listCurrentUserSupportTicketsController,
+  listCurrentUserTransactionActivityController,
   listCurrentUserTopUpOrdersController,
   submitCurrentUserFundingEvidenceController,
   uploadCurrentUserFundingEvidenceController,
@@ -19,8 +22,10 @@ const { requireAuthenticatedUser } = require('../middleware/authenticateRequest'
 const { requireIdempotencyKey } = require('../middleware/requireIdempotencyKey');
 const { fundingRateLimiter } = require('../middleware/rateLimiters');
 const {
+  getCurrentUserNotificationPreferencesController,
   listCurrentUserNotificationsController,
-  markCurrentUserNotificationReadController
+  markCurrentUserNotificationReadController,
+  updateCurrentUserNotificationPreferencesController
 } = require('../controllers/notificationController');
 
 const router = express.Router();
@@ -34,6 +39,11 @@ router.post('/me/points/funding/requests/:id/evidence/upload', requireAuthentica
 router.get('/me/points/funding/requests/:id/evidence', requireAuthenticatedUser, asyncHandler(getCurrentUserFundingEvidenceController));
 router.get('/me/notifications', requireAuthenticatedUser, asyncHandler(listCurrentUserNotificationsController));
 router.post('/me/notifications/:id/read', requireAuthenticatedUser, asyncHandler(markCurrentUserNotificationReadController));
+router.get('/me/notification-preferences', requireAuthenticatedUser, asyncHandler(getCurrentUserNotificationPreferencesController));
+router.patch('/me/notification-preferences', requireAuthenticatedUser, fundingRateLimiter, asyncHandler(updateCurrentUserNotificationPreferencesController));
+router.get('/me/support-tickets', requireAuthenticatedUser, asyncHandler(listCurrentUserSupportTicketsController));
+router.get('/me/transaction-activity', requireAuthenticatedUser, asyncHandler(listCurrentUserTransactionActivityController));
+router.post('/me/support-tickets', requireAuthenticatedUser, fundingRateLimiter, asyncHandler(createCurrentUserSupportTicketController));
 router.get('/me/top-up-orders', requireAuthenticatedUser, asyncHandler(listCurrentUserTopUpOrdersController));
 router.post('/me/top-up-orders', requireAuthenticatedUser, fundingRateLimiter, requireIdempotencyKey, asyncHandler(createCurrentUserTopUpOrderController));
 router.patch('/me/top-up-orders/:id/status', requireAuthenticatedUser, requireIdempotencyKey, asyncHandler(updateCurrentUserTopUpOrderStatusController));

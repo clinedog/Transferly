@@ -60,9 +60,29 @@ async function findByUserOperationAndKey(userId, operation, idempotencyKey, clie
   return mapIdempotencyRecord(row);
 }
 
+async function updateResponse(userId, operation, idempotencyKey, response, client = db) {
+  await client.run(
+    `
+      UPDATE idempotency_records
+      SET response_status = ?, response_payload = ?
+      WHERE user_id = ? AND operation = ? AND idempotency_key = ?
+    `,
+    [
+      response.responseStatus ?? null,
+      serializeJson(response.responsePayload),
+      userId,
+      operation,
+      idempotencyKey
+    ]
+  );
+
+  return findByUserOperationAndKey(userId, operation, idempotencyKey, client);
+}
+
 module.exports = {
   idempotencyRepository: {
     create,
-    findByUserOperationAndKey
+    findByUserOperationAndKey,
+    updateResponse
   }
 };

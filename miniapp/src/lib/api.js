@@ -1,4 +1,5 @@
 import { buildRequestDedupKey, createRequestDeduper } from './requestDeduper.js';
+import { readThroughCache } from './readCache.js';
 
 const RAW_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE_URL = RAW_API_BASE_URL.replace(/\/$/, '');
@@ -659,10 +660,36 @@ export function listNotifications(params = {}) {
   return apiRequest(`/api/user/me/notifications${buildQuery(params)}`);
 }
 
+export function getNotificationPreferences() {
+  return apiRequest('/api/user/me/notification-preferences');
+}
+
+export function updateNotificationPreferences(payload) {
+  return apiRequest('/api/user/me/notification-preferences', {
+    method: 'PATCH',
+    body: payload
+  });
+}
+
+export function listTransactionActivity(params = {}) {
+  return apiRequest(`/api/user/me/transaction-activity${buildQuery(params)}`);
+}
+
 export function markNotificationRead(notificationId) {
   return apiRequest(`/api/user/me/notifications/${encodeURIComponent(notificationId)}/read`, {
     method: 'POST',
     body: {}
+  });
+}
+
+export function listSupportTickets(params = {}) {
+  return apiRequest(`/api/user/me/support-tickets${buildQuery(params)}`);
+}
+
+export function createSupportTicket(payload) {
+  return apiRequest('/api/user/me/support-tickets', {
+    method: 'POST',
+    body: payload
   });
 }
 
@@ -805,19 +832,31 @@ function buildProviderPath(provider, suffix = '') {
 }
 
 export function listProviderCapabilities() {
-  return apiRequest('/api/providers');
+  return readThroughCache('provider-capabilities', () => apiRequest('/api/providers'), {
+    ttlMs: 60000,
+    staleMs: 300000
+  });
 }
 
 export function getProviderCapability(provider) {
-  return apiRequest(buildProviderPath(provider));
+  return readThroughCache(`provider-capability:${provider}`, () => apiRequest(buildProviderPath(provider)), {
+    ttlMs: 60000,
+    staleMs: 300000
+  });
 }
 
 export function listProviderReadiness() {
-  return apiRequest('/api/providers/readiness');
+  return readThroughCache('provider-readiness', () => apiRequest('/api/providers/readiness'), {
+    ttlMs: 30000,
+    staleMs: 120000
+  });
 }
 
 export function getProviderReadiness(provider) {
-  return apiRequest(buildProviderPath(provider, 'readiness'));
+  return readThroughCache(`provider-readiness:${provider}`, () => apiRequest(buildProviderPath(provider, 'readiness')), {
+    ttlMs: 30000,
+    staleMs: 120000
+  });
 }
 
 export function getProviderHealth(provider) {

@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const { z } = require('zod');
 
 const { deriveEnvironmentConfig, validateProductionConfig } = require('./core/config/environment');
+const { buildValidatedConfiguration } = require('./core/config/validatedConfiguration');
 
 dotenv.config();
 
@@ -153,8 +154,10 @@ const derived = deriveEnvironmentConfig(parsed);
 validateProductionConfig(parsed, derived);
 const sqliteDatabasePath = derived.SQLITE_DATABASE_PATH;
 mkdirSync(path.dirname(sqliteDatabasePath), { recursive: true });
+const configuration = buildValidatedConfiguration(parsed, derived);
 
 module.exports = {
   ...parsed,
-  ...derived
+  ...derived,
+  configuration
 };
