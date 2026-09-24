@@ -18,11 +18,38 @@ function mapNotification(row) {
 const notificationRepository = {
   async createNotification({ userId, type, title, message, data = {} }, client = db) {
     const id = `notif:${randomUUID()}`;
+    const now = new Date().toISOString();
     await client.run(
       `INSERT INTO notifications (id, user_id, type, title, message, data_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, type, title, message, JSON.stringify(data), new Date().toISOString()]
+      [id, userId, type, title, message, JSON.stringify(data), now]
+    );
+    await client.run(
+      `INSERT INTO notification_deliveries
+        (id, notification_id, channel, status, attempt_count, sent_at, created_at, updated_at)
+       VALUES (?, ?, 'in_app', 'delivered', 1, ?, ?, ?)`,
+      [`delivery:${randomUUID()}`, id, now, now, now]
     );
     return mapNotification(await client.get('SELECT * FROM notifications WHERE id = ?', [id]));
+  },
+
+  async listPendingDeliveries({ limit = 50, now = new Date().toISOString() } = {}, client = db) {
+    return client.all(
+      `SELECT * FROM notification_deliveries
+       WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+       ORDER BY created_at ASC LIMIT ?`,
+      [now, Math.min(Math.max(Number(limit) || 50, 1), 100)]
+    );
+  },
+
+  async recordDeliveryFailure({ id, errorCode, errorMessage, nextAttemptAt }, client = db) {
+    const result = await client.run(
+      `UPDATE notification_deliveries
+       SET status = 'pending', attempt_count = attempt_count + 1,
+           next_attempt_at = ?, last_error_code = ?, last_error_message = ?, updated_at = ?
+       WHERE id = ? AND status = 'pending'`,
+      [nextAttemptAt, errorCode, String(errorMessage || '').slice(0, 1000), new Date().toISOString(), id]
+    );
+    return result.changes === 1;
   },
 
   async listForUser(userId, { limit = 50 } = {}, client = db) {
